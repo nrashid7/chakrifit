@@ -100,7 +100,7 @@ function Dashboard() {
   const all = (matches.data?.matches ?? []) as MatchRow[];
   const eligible = all.filter((m) => m.eligibility_status === "eligible");
   const partial = all.filter((m) => m.eligibility_status === "partial");
-  const best = all.length ? Math.max(...all.map((m) => m.score)) : 0;
+  const bestScore = all.length ? Math.max(...all.map((m) => m.score)) : 0;
 
   return (
     <div className="space-y-8">
@@ -143,7 +143,7 @@ function Dashboard() {
           <Metric label="Total scored" value={all.length} />
           <Metric label="Eligible" value={eligible.length} tone="success" />
           <Metric label="Partial" value={partial.length} tone="warning" />
-          <Metric label="Best score" value={`${best}%`} />
+          <Metric label="Best score" value={`${bestScore}%`} />
         </div>
       </section>
 
