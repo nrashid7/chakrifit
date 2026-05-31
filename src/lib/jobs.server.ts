@@ -343,6 +343,11 @@ function withResolvedAdvertisementFile(detail: TeletalkDetail, pdfUrl: string | 
 /**
  * Crawl government jobs directly from the Teletalk public API and enrich the
  * official Teletalk PDF with Mistral OCR when needed.
+ *
+ * Inserts a `crawl_runs` row with status='running' up front and updates it
+ * after each job so the dashboard can poll live progress. Honors cooperative
+ * cancellation: if the row's status becomes 'cancelled' mid-run, the loop
+ * stops and partial progress is preserved.
  */
 export async function crawlGovernmentJobs(limit: number, triggeredBy?: string) {
   const startedAt = new Date().toISOString();
@@ -352,6 +357,35 @@ export async function crawlGovernmentJobs(limit: number, triggeredBy?: string) {
   let ocrAttempts = 0;
   let enriched = 0;
   let skippedEnrichment = 0;
+
+  // 1. Create the run row immediately so the dashboard can subscribe to it.
+  const { data: runInsert, error: insertError } = await supabaseAdmin
+    .from("crawl_runs")
+    .insert({
+      started_at: startedAt,
+      status: "running",
+      progress_message: "Discovering circulars from Teletalk...",
+      triggered_by: triggeredBy ?? null,
+    })
+    .select("id")
+    .maybeSingle();
+  if (insertError) throw new Error(insertError.message);
+  const runId = runInsert?.id ?? null;
+
+  async function isCancelled(): Promise<boolean> {
+    if (!runId) return false;
+    const { data } = await supabaseAdmin
+      .from("crawl_runs")
+      .select("status")
+      .eq("id", runId)
+      .maybeSingle();
+    return data?.status === "cancelled";
+  }
+
+  async function updateProgress(fields: Record<string, unknown>) {
+    if (!runId) return;
+    await supabaseAdmin.from("crawl_runs").update(fields).eq("id", runId);
+  }
 
   const pageSize = Math.min(20, Math.max(5, limit));
   let listed: TeletalkListJob[] = [];
@@ -385,13 +419,31 @@ export async function crawlGovernmentJobs(limit: number, triggeredBy?: string) {
   const candidates = listed.slice(0, limit);
   const results: { url: string; ok: boolean; error?: string; enriched?: boolean }[] = [];
 
+  await updateProgress({
+    discovered: listed.length,
+    attempted: 0,
+    progress_message: `Found ${listed.length} circulars. Processing 0 / ${candidates.length}...`,
+  });
+
+  let cancelled = false;
+
   for (const job of candidates) {
+    if (await isCancelled()) {
+      cancelled = true;
+      break;
+    }
     const fallbackUrl = `${SITE_BASE}/jobs/government/${job.organization_id}?jobId=${job.job_id}`;
     let circularUrl = fallbackUrl;
     try {
       const detail = await fetchTeletalkJobDetail(job.id);
       if (!detail) {
         results.push({ url: fallbackUrl, ok: false, error: "Detail not found" });
+        await updateProgress({
+          attempted: results.length,
+          succeeded: results.filter((r) => r.ok).length,
+          failed: results.filter((r) => !r.ok).length,
+          progress_message: `Processed ${results.length} / ${candidates.length}`,
+        });
         continue;
       }
 
@@ -523,6 +575,13 @@ export async function crawlGovernmentJobs(limit: number, triggeredBy?: string) {
         error: error instanceof Error ? error.message : String(error),
       });
     }
+
+    await updateProgress({
+      attempted: results.length,
+      succeeded: results.filter((r) => r.ok).length,
+      failed: results.filter((r) => !r.ok).length,
+      progress_message: `Processed ${results.length} / ${candidates.length}`,
+    });
   }
 
   const succeeded = results.filter((r) => r.ok).length;
@@ -532,37 +591,36 @@ export async function crawlGovernmentJobs(limit: number, triggeredBy?: string) {
     ...results.filter((r) => !r.ok).map((r) => ({ url: r.url, error: r.error ?? "Unknown" })),
   ];
 
-  const { data: runRow, error: runError } = await supabaseAdmin
-    .from("crawl_runs")
-    .insert({
-      started_at: startedAt,
-      finished_at: new Date().toISOString(),
-      discovered: listed.length,
-      attempted: candidates.length,
-      succeeded,
-      failed,
-      errors: [
-        ...errors,
-        {
-          url: "strategy",
-          error: JSON.stringify({
-            enriched,
-            ocr_attempts: ocrAttempts,
-            skipped_enrichment: skippedEnrichment,
-            strategy_used: "teletalk_api_mistral_ocr",
-          }),
-        },
-      ],
-      triggered_by: triggeredBy ?? null,
-    })
-    .select("id")
-    .maybeSingle();
-  if (runError) throw new Error(runError.message);
+  const finalStatus = cancelled ? "cancelled" : "completed";
+  await updateProgress({
+    status: finalStatus,
+    finished_at: new Date().toISOString(),
+    discovered: listed.length,
+    attempted: results.length,
+    succeeded,
+    failed,
+    errors: [
+      ...errors,
+      {
+        url: "strategy",
+        error: JSON.stringify({
+          enriched,
+          ocr_attempts: ocrAttempts,
+          skipped_enrichment: skippedEnrichment,
+          strategy_used: "teletalk_api_mistral_ocr",
+        }),
+      },
+    ],
+    progress_message: cancelled
+      ? `Cancelled after ${results.length} of ${candidates.length} jobs`
+      : `Completed ${results.length} / ${candidates.length}`,
+  });
 
   return {
-    runId: runRow?.id ?? null,
+    runId,
+    status: finalStatus,
     discovered: listed.length,
-    attempted: candidates.length,
+    attempted: results.length,
     succeeded,
     failed,
     enriched,
@@ -583,3 +641,20 @@ export async function getLatestCrawlRun() {
   if (error) throw new Error(error.message);
   return { run: data };
 }
+
+export async function cancelCrawlRunInDb(runId: string) {
+  const { data, error } = await supabaseAdmin
+    .from("crawl_runs")
+    .update({
+      status: "cancelled",
+      finished_at: new Date().toISOString(),
+      progress_message: "Cancelled by admin",
+    })
+    .eq("id", runId)
+    .in("status", ["queued", "running"])
+    .select("id, status")
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return { cancelled: !!data, run: data };
+}
+
