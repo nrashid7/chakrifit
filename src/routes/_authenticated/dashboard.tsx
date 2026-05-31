@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { getMyProfile } from "@/lib/resume.functions";
 import { listMatches, computeMatches, explainMatch } from "@/lib/matches.functions";
 import { toggleSave } from "@/lib/saved.functions";
@@ -21,6 +21,7 @@ type MatchRow = {
   id: string;
   score: number;
   eligibility_status: "eligible" | "partial" | "not_eligible";
+  explanation: string | null;
   job: {
     id: string;
     title: string;
@@ -44,6 +45,15 @@ function Dashboard() {
   const profile = useQuery({ queryKey: ["profile"], queryFn: () => profileFn() });
   const matches = useQuery({ queryKey: ["matches"], queryFn: () => matchesFn() });
 
+  // First-time onboarding redirect
+  useEffect(() => {
+    if (profile.isLoading) return;
+    const p = profile.data;
+    if (!p?.profile || p.education.length === 0) {
+      navigate({ to: "/onboarding", replace: true });
+    }
+  }, [profile.data, profile.isLoading, navigate]);
+
   const compute = useMutation({
     mutationFn: () => computeFn(),
     onSuccess: () => { toast.success("Matches refreshed"); qc.invalidateQueries({ queryKey: ["matches"] }); },
@@ -56,18 +66,7 @@ function Dashboard() {
   });
 
   if (profile.isLoading) return <div className="text-center py-12 text-muted-foreground">Loading…</div>;
-
-  if (!profile.data?.profile) {
-    return (
-      <div className="max-w-md mx-auto text-center py-12">
-        <h2 className="text-2xl font-bold">Welcome to ChakriFit</h2>
-        <p className="mt-2 text-muted-foreground">Upload your resume to see jobs you qualify for.</p>
-        <Button className="mt-6" onClick={() => navigate({ to: "/profile" })}>
-          Upload resume
-        </Button>
-      </div>
-    );
-  }
+  if (!profile.data?.profile) return null;
 
   const all = (matches.data?.matches ?? []) as MatchRow[];
   const eligible = all.filter((m) => m.eligibility_status === "eligible");
@@ -145,7 +144,7 @@ function MatchCard({
   qc: ReturnType<typeof useQueryClient>;
 }) {
   const [open, setOpen] = useState(false);
-  const [text, setText] = useState<string | null>(null);
+  const [text, setText] = useState<string | null>(m.explanation);
   const [loading, setLoading] = useState(false);
 
   async function loadExplain() {
@@ -180,7 +179,9 @@ function MatchCard({
       <div className="rounded-2xl border bg-card p-5 shadow-sm hover:shadow-md transition">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h3 className="font-semibold truncate">{m.job.title}</h3>
+            <Link to="/jobs/$jobId" params={{ jobId: m.job.id }} className="hover:underline">
+              <h3 className="font-semibold truncate">{m.job.title}</h3>
+            </Link>
             <p className="text-xs text-muted-foreground truncate">{m.job.organization ?? "—"}</p>
           </div>
           <div className={`text-lg font-bold ${tone === "success" ? "text-success" : tone === "warning" ? "text-warning-foreground" : "text-muted-foreground"}`}>
@@ -194,9 +195,12 @@ function MatchCard({
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
           <Button size="sm" variant="default" onClick={loadExplain}>Why I match</Button>
+          <Link to="/jobs/$jobId" params={{ jobId: m.job.id }}>
+            <Button size="sm" variant="outline">Details</Button>
+          </Link>
           {m.job.circular_url && (
             <a href={m.job.circular_url} target="_blank" rel="noreferrer">
-              <Button size="sm" variant="outline"><ExternalLink className="h-3 w-3" /> Circular</Button>
+              <Button size="sm" variant="outline"><ExternalLink className="h-3 w-3" /></Button>
             </a>
           )}
           <Button size="sm" variant="ghost" onClick={handleSave}><BookmarkPlus className="h-4 w-4" /></Button>

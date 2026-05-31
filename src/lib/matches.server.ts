@@ -2,9 +2,12 @@ import { generateText } from "ai";
 
 import { computeMatch, type JobRequirements, type ParsedProfile } from "./matching";
 import { createLovableAiGatewayProvider, requireLovableApiKey } from "./ai-gateway.server";
+import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 type JobRow = {
   id: string;
+  title?: string;
+  organization?: string | null;
   age_limit: unknown;
   education_requirements: unknown;
   experience_requirements: unknown;
@@ -83,6 +86,8 @@ export function buildMatchRows({
       eligibility_status: result.status,
       reasons: result.reasons,
       explanation: null as string | null,
+      _job_title: job.title ?? "Position",
+      _job_org: job.organization ?? null,
     };
   });
 }
@@ -119,4 +124,88 @@ export async function explainEligibilityMatch({
   });
 
   return text;
+}
+
+// Limit concurrency for AI calls
+async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T, idx: number) => Promise<R>): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let cursor = 0;
+  async function worker() {
+    while (true) {
+      const i = cursor++;
+      if (i >= items.length) return;
+      try {
+        results[i] = await fn(items[i], i);
+      } catch (e) {
+        // swallow per-item failures; explanation stays null
+        results[i] = undefined as unknown as R;
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+
+/**
+ * Recompute matches for a user. Wipes existing rows, scores all jobs,
+ * generates AI explanations up-front, and inserts in chunks.
+ * Uses supabaseAdmin so it can be called from any authenticated server fn.
+ */
+export async function recomputeMatchesForUser(userId: string) {
+  const { data: profile } = await supabaseAdmin
+    .from("profiles")
+    .select("*")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (!profile) return { count: 0 };
+
+  const [{ data: education }, { data: experience }, { data: jobs }] = await Promise.all([
+    supabaseAdmin.from("education").select("*").eq("profile_id", profile.id),
+    supabaseAdmin.from("experience").select("*").eq("profile_id", profile.id),
+    supabaseAdmin.from("jobs").select("*"),
+  ]);
+
+  const rows = buildMatchRows({
+    userId,
+    profile,
+    education: education ?? [],
+    experience: experience ?? [],
+    jobs: jobs ?? [],
+  });
+
+  // Pre-generate explanations for top scoring rows (eligible + partial) to keep cost bounded.
+  const explainCandidates = rows
+    .map((r, idx) => ({ r, idx }))
+    .filter(({ r }) => r.eligibility_status !== "not_eligible")
+    .slice(0, 40); // cap
+
+  const explanations = await mapWithConcurrency(explainCandidates, 4, async ({ r }) => {
+    return explainEligibilityMatch({
+      title: r._job_title,
+      organization: r._job_org,
+      status: r.eligibility_status,
+      score: r.score,
+      positives: r.reasons.positives ?? [],
+      negatives: r.reasons.negatives ?? [],
+    });
+  });
+
+  explainCandidates.forEach(({ idx }, i) => {
+    const text = explanations[i];
+    if (typeof text === "string") rows[idx].explanation = text;
+  });
+
+  // Strip helper-only fields before insert
+  const insertRows = rows.map(({ _job_title, _job_org, ...row }) => row);
+
+  await supabaseAdmin.from("matches").delete().eq("user_id", userId);
+  if (insertRows.length === 0) return { count: 0 };
+
+  const CHUNK = 100;
+  for (let i = 0; i < insertRows.length; i += CHUNK) {
+    const slice = insertRows.slice(i, i + CHUNK);
+    const { error } = await supabaseAdmin.from("matches").insert(slice);
+    if (error) throw new Error(error.message);
+  }
+  return { count: insertRows.length };
 }

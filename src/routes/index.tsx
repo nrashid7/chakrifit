@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { SiteHeader, SiteFooter } from "@/components/site-chrome";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Upload, Sparkles, ShieldCheck, Clock, ChevronRight } from "lucide-react";
 
 export const Route = createFileRoute("/")({
@@ -12,6 +13,33 @@ export const Route = createFileRoute("/")({
   }),
   component: Landing,
 });
+
+const faqs = [
+  {
+    q: "Is ChakriFit affiliated with the government or Teletalk?",
+    a: "No. ChakriFit is an independent product. We read publicly available circulars from the Teletalk portal — we don't submit applications and we can't influence recruitment.",
+  },
+  {
+    q: "What does it cost?",
+    a: "Free during MVP. If we ever add paid features, the core job-matching will stay free.",
+  },
+  {
+    q: "How accurate is the eligibility score?",
+    a: "It's a best-effort estimate. We use deterministic rules (age, degree, subject, experience, skills) plus AI parsing of circulars. Always confirm requirements in the official circular before applying.",
+  },
+  {
+    q: "What happens to my resume?",
+    a: "Your resume file is stored privately in our cloud storage with row-level security so only you can read it. We extract structured fields with AI for matching. You can delete the file or your entire account from Settings at any time.",
+  },
+  {
+    q: "Do you support Bangla resumes?",
+    a: "Yes. The AI parser handles English, Bangla, and mixed-language resumes.",
+  },
+  {
+    q: "How often is the job list updated?",
+    a: "We crawl new Teletalk circulars on a daily schedule. You can also manually trigger a refresh from your dashboard.",
+  },
+];
 
 function Landing() {
   return (
@@ -44,9 +72,7 @@ function Landing() {
                 <Upload className="h-4 w-4" /> Upload resume
               </Button>
             </Link>
-            <a href="#how">
-              <Button size="lg" variant="outline">How it works</Button>
-            </a>
+            <a href="#how"><Button size="lg" variant="outline">How it works</Button></a>
           </div>
         </section>
 
@@ -64,37 +90,6 @@ function Landing() {
           ))}
         </section>
 
-        <section className="mx-auto max-w-4xl px-4 py-12">
-          <div className="rounded-2xl border bg-accent/30 p-8">
-            <h2 className="text-2xl font-bold">An example match</h2>
-            <div className="mt-4 grid sm:grid-cols-2 gap-4 text-sm">
-              <div className="rounded-xl bg-background p-4 border">
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold">Assistant Director</span>
-                  <span className="text-success font-semibold">92%</span>
-                </div>
-                <p className="text-muted-foreground mt-1">Bangladesh Bank · Deadline Dec 15</p>
-                <ul className="mt-3 space-y-1 text-foreground/80">
-                  <li>✓ Your BBA matches the required field</li>
-                  <li>✓ Age (27) within 30 limit</li>
-                  <li>✓ No prior experience required</li>
-                </ul>
-              </div>
-              <div className="rounded-xl bg-background p-4 border">
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold">Sub-Assistant Engineer</span>
-                  <span className="text-destructive font-semibold">28%</span>
-                </div>
-                <p className="text-muted-foreground mt-1">LGED · Deadline Dec 20</p>
-                <ul className="mt-3 space-y-1 text-foreground/80">
-                  <li>✗ Requires Diploma in Civil Engineering</li>
-                  <li>✓ Age within limit</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        </section>
-
         <section className="mx-auto max-w-5xl px-4 py-12 grid gap-6 sm:grid-cols-3">
           {[
             { icon: Clock, title: "Updated daily", body: "We crawl new Teletalk circulars so you never miss a deadline." },
@@ -107,6 +102,19 @@ function Landing() {
               <p className="mt-1 text-sm text-muted-foreground">{s.body}</p>
             </div>
           ))}
+        </section>
+
+        <section id="faq" className="mx-auto max-w-3xl px-4 py-16">
+          <h2 className="text-2xl font-bold text-center">Frequently asked</h2>
+          <p className="text-sm text-muted-foreground text-center mt-1">Everything you might want to know before you upload.</p>
+          <Accordion type="single" collapsible className="mt-6">
+            {faqs.map((f, i) => (
+              <AccordionItem key={i} value={`q${i}`}>
+                <AccordionTrigger className="text-left">{f.q}</AccordionTrigger>
+                <AccordionContent className="text-muted-foreground">{f.a}</AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
         </section>
 
         <section className="mx-auto max-w-3xl px-4 py-12 text-center">
