@@ -1,37 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { generateText } from "ai";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { computeMatch, type JobRequirements, type ParsedProfile } from "./matching";
-import { createLovableAiGatewayProvider, requireLovableApiKey } from "./ai-gateway.server";
-
-type JobRow = {
-  id: string;
-  title: string;
-  organization: string | null;
-  deadline: string | null;
-  salary: string | null;
-  age_limit: { max_age?: number | null; min_age?: number | null } | null;
-  education_requirements: {
-    required_degrees?: string[];
-    required_subjects?: string[];
-  } | null;
-  experience_requirements: {
-    min_experience_years?: number | null;
-    preferred_skills?: string[];
-  } | null;
-};
-
-function jobToRequirements(job: JobRow): JobRequirements {
-  return {
-    max_age: job.age_limit?.max_age ?? null,
-    min_age: job.age_limit?.min_age ?? null,
-    required_degrees: job.education_requirements?.required_degrees ?? [],
-    required_subjects: job.education_requirements?.required_subjects ?? [],
-    min_experience_years: job.experience_requirements?.min_experience_years ?? null,
-    preferred_skills: job.experience_requirements?.preferred_skills ?? [],
-  };
-}
+import { buildMatchRows, explainEligibilityMatch } from "./matches.server";
 
 export const computeMatches = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -51,33 +21,12 @@ export const computeMatches = createServerFn({ method: "POST" })
       supabase.from("jobs").select("*"),
     ]);
 
-    const parsedProfile: ParsedProfile = {
-      age: profile.age,
-      location: profile.location ?? undefined,
-      skills: profile.skills ?? [],
-      education: (education ?? []).map((e) => ({
-        degree: e.degree ?? undefined,
-        subject: e.subject ?? undefined,
-        institution: e.institution ?? undefined,
-        graduation_year: e.graduation_year ?? undefined,
-      })),
-      experience: (experience ?? []).map((x) => ({
-        title: x.title ?? undefined,
-        company: x.company ?? undefined,
-        years: Number(x.years) || 0,
-      })),
-    };
-
-    const rows = (jobs ?? []).map((j) => {
-      const result = computeMatch(parsedProfile, jobToRequirements(j as JobRow));
-      return {
-        user_id: userId,
-        job_id: j.id,
-        score: result.score,
-        eligibility_status: result.status,
-        reasons: result.reasons,
-        explanation: null as string | null,
-      };
+    const rows = buildMatchRows({
+      userId,
+      profile,
+      education: education ?? [],
+      experience: experience ?? [],
+      jobs: jobs ?? [],
     });
 
     if (rows.length === 0) return { count: 0 };
@@ -122,24 +71,17 @@ export const explainMatch = createServerFn({ method: "POST" })
     if (!match) throw new Error("Match not found");
     if (match.explanation) return { explanation: match.explanation };
 
-    const gateway = createLovableAiGatewayProvider(requireLovableApiKey());
-    const model = gateway("google/gemini-3-flash-preview");
     const reasons = (match.reasons ?? { positives: [], negatives: [] }) as {
       positives?: string[];
       negatives?: string[];
     };
-    const { text } = await generateText({
-      model,
-      system:
-        "You explain Bangladesh government job eligibility in plain, friendly English. " +
-        "Be concise (≤6 short bullet points). Use 'You' to address the user. " +
-        "Start with strengths, then any disqualifiers. No fluff, no salutations.",
-      prompt:
-        `Job: ${match.job.title} at ${match.job.organization ?? "—"}\n` +
-        `Status: ${match.eligibility_status} (score ${match.score}/100)\n\n` +
-        `Why you match:\n${(reasons.positives ?? []).map((p) => `- ${p}`).join("\n")}\n\n` +
-        `Why you may not:\n${(reasons.negatives ?? []).map((p) => `- ${p}`).join("\n")}\n\n` +
-        `Write the final user-facing explanation now.`,
+    const text = await explainEligibilityMatch({
+      title: match.job.title,
+      organization: match.job.organization ?? null,
+      status: match.eligibility_status,
+      score: match.score,
+      positives: reasons.positives ?? [],
+      negatives: reasons.negatives ?? [],
     });
 
     await supabase.from("matches").update({ explanation: text }).eq("id", match.id);
