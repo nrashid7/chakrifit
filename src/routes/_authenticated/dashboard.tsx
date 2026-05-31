@@ -147,25 +147,20 @@ function Dashboard() {
                 <Button
                   variant="outline"
                   onClick={() => crawl.mutate()}
-                  disabled={crawl.isPending}
+                  disabled={crawl.isPending || isRunning}
                 >
-                  {crawl.isPending ? (
+                  {crawl.isPending || isRunning ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     <RefreshCw className="h-4 w-4" />
                   )}
                   Fetch circulars
                 </Button>
-                {crawl.isPending && (
+                {isRunning && runRow && (
                   <Button
                     variant="ghost"
-                    onClick={() => {
-                      crawl.reset();
-                      toast.info(
-                        "Stopped waiting. The fetch may still finish in the background.",
-                      );
-                      qc.invalidateQueries({ queryKey: ["latest-crawl-run"] });
-                    }}
+                    onClick={() => cancel.mutate(runRow.id)}
+                    disabled={cancel.isPending}
                   >
                     Cancel
                   </Button>
