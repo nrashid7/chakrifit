@@ -82,6 +82,10 @@ export async function crawlGovernmentJobs(limit: number, triggeredBy?: string) {
       .filter((url) => !/\/(jobs\/government|login|signup|about|contact)\/?$/.test(url));
   } catch (error) {
     console.error("Firecrawl map failed", error);
+    mapErrors.push({
+      url: TELETALK_INDEX,
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 
   const { data: existing } = await supabaseAdmin.from("jobs").select("external_job_id");
