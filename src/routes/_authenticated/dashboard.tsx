@@ -101,7 +101,6 @@ function Dashboard() {
   const eligible = all.filter((m) => m.eligibility_status === "eligible");
   const partial = all.filter((m) => m.eligibility_status === "partial");
   const best = all.length ? Math.max(...all.map((m) => m.score)) : 0;
-  const best = all.length ? Math.max(...all.map((m) => m.score)) : 0;
 
   return (
     <div className="space-y-8">
