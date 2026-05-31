@@ -67,7 +67,9 @@ async function firecrawlWithFallback<T>(fn: (client: Firecrawl) => Promise<T>): 
   throw lastError instanceof Error ? lastError : new Error(String(lastError));
 }
 
-export async function crawlGovernmentJobs(limit: number) {
+export async function crawlGovernmentJobs(limit: number, triggeredBy?: string) {
+  const startedAt = new Date().toISOString();
+  const mapErrors: { url: string; error: string }[] = [];
   if (getFirecrawlKeys().length === 0) throw new Error("Firecrawl is not connected");
 
   let urls: string[] = [];
@@ -80,6 +82,10 @@ export async function crawlGovernmentJobs(limit: number) {
       .filter((url) => !/\/(jobs\/government|login|signup|about|contact)\/?$/.test(url));
   } catch (error) {
     console.error("Firecrawl map failed", error);
+    mapErrors.push({
+      url: TELETALK_INDEX,
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 
   const { data: existing } = await supabaseAdmin.from("jobs").select("external_job_id");
@@ -135,5 +141,45 @@ export async function crawlGovernmentJobs(limit: number) {
     }
   }
 
-  return { discovered: urls.length, attempted: toScrape.length, results };
+  const succeeded = results.filter((r) => r.ok).length;
+  const failed = results.length - succeeded;
+  const errorList = [
+    ...mapErrors,
+    ...results.filter((r) => !r.ok).map((r) => ({ url: r.url, error: r.error ?? "Unknown error" })),
+  ];
+
+  const { data: runRow } = await supabaseAdmin
+    .from("crawl_runs")
+    .insert({
+      started_at: startedAt,
+      finished_at: new Date().toISOString(),
+      discovered: urls.length,
+      attempted: toScrape.length,
+      succeeded,
+      failed,
+      errors: errorList,
+      triggered_by: triggeredBy ?? null,
+    })
+    .select("id")
+    .maybeSingle();
+
+  return {
+    runId: runRow?.id ?? null,
+    discovered: urls.length,
+    attempted: toScrape.length,
+    succeeded,
+    failed,
+    results,
+  };
+}
+
+export async function getLatestCrawlRun() {
+  const { data, error } = await supabaseAdmin
+    .from("crawl_runs")
+    .select("*")
+    .order("started_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return { run: data };
 }

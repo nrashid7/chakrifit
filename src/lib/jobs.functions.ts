@@ -1,7 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { crawlGovernmentJobs, getJobFromDb, listJobsFromDb } from "./jobs.server";
+import {
+  crawlGovernmentJobs,
+  getJobFromDb,
+  getLatestCrawlRun,
+  listJobsFromDb,
+} from "./jobs.server";
 
 export const listJobs = createServerFn({ method: "GET" }).handler(async () => {
   return listJobsFromDb();
@@ -35,5 +40,16 @@ export const crawlJobs = createServerFn({ method: "POST" })
     if (!adminEmail || email !== adminEmail) {
       throw new Error("Unauthorized");
     }
-    return crawlGovernmentJobs(data.limit);
+    return crawlGovernmentJobs(data.limit, userData.user?.id);
+  });
+
+export const latestCrawlRun = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const adminEmail = process.env.ADMIN_EMAIL;
+    const { data: userData } = await context.supabase.auth.getUser();
+    if (!adminEmail || userData.user?.email !== adminEmail) {
+      throw new Error("Unauthorized");
+    }
+    return getLatestCrawlRun();
   });
