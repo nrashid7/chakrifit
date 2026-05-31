@@ -1,6 +1,5 @@
 // Browser-side resume text extraction. PDF via pdfjs-dist, DOCX via mammoth.
 import * as pdfjsLib from "pdfjs-dist";
-// @ts-expect-error - worker URL
 import workerSrc from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
@@ -20,14 +19,19 @@ async function extractPdf(file: File): Promise<string> {
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i);
     const content = await page.getTextContent();
-    const strings = content.items.map((it: { str?: string }) => it.str ?? "").filter(Boolean);
+    const strings = content.items
+      .map((it) => ("str" in it ? it.str : ""))
+      .filter(Boolean);
     text += strings.join(" ") + "\n\n";
   }
   return text.trim();
 }
 
 async function extractDocx(file: File): Promise<string> {
-  const mammoth = await import("mammoth/mammoth.browser");
+  // mammoth ships a browser build but no types for the subpath
+  const mammoth = (await import(
+    /* @vite-ignore */ "mammoth/mammoth.browser"
+  )) as { extractRawText: (opts: { arrayBuffer: ArrayBuffer }) => Promise<{ value: string }> };
   const buf = await file.arrayBuffer();
   const result = await mammoth.extractRawText({ arrayBuffer: buf });
   return (result.value ?? "").trim();
