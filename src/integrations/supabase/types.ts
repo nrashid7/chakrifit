@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      crawl_runs: {
+        Row: {
+          attempted: number
+          discovered: number
+          errors: Json
+          failed: number
+          finished_at: string | null
+          id: string
+          started_at: string
+          succeeded: number
+          triggered_by: string | null
+        }
+        Insert: {
+          attempted?: number
+          discovered?: number
+          errors?: Json
+          failed?: number
+          finished_at?: string | null
+          id?: string
+          started_at?: string
+          succeeded?: number
+          triggered_by?: string | null
+        }
+        Update: {
+          attempted?: number
+          discovered?: number
+          errors?: Json
+          failed?: number
+          finished_at?: string | null
+          id?: string
+          started_at?: string
+          succeeded?: number
+          triggered_by?: string | null
+        }
+        Relationships: []
+      }
       education: {
         Row: {
           created_at: string
