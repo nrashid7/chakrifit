@@ -44,6 +44,18 @@ fee, and salary details often live inside the official advertisement PDF. When
    response mode.
 4. Saves normalized requirements into the existing `jobs` table.
 
+The OCR request uses Mistral's document URL schema:
+
+```json
+{
+  "model": "mistral-ocr-latest",
+  "document": {
+    "type": "document_url",
+    "document_url": "https://alljobs.teletalk.com.bd/media/..."
+  }
+}
+```
+
 Firecrawl is no longer required.
 
 ## Mapping To `jobs`

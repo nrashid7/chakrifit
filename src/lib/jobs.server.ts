@@ -34,6 +34,20 @@ type ExistingJob = {
   age_limit: unknown;
 };
 
+type MistralDocumentUrlRequest = {
+  model: "mistral-ocr-latest";
+  document: {
+    type: "document_url";
+    document_url: string;
+  };
+};
+
+type MistralRequestContext = {
+  pdfUrl?: string | null;
+  jobId?: string | number | null;
+  jobTitle?: string | null;
+};
+
 export async function listJobsFromDb() {
   const { data, error } = await supabaseAdmin
     .from("jobs")
@@ -194,7 +208,12 @@ export function extractJsonObject(text: string): unknown {
   return JSON.parse(unfenced.slice(start, end + 1));
 }
 
-async function postMistral(path: string, body: unknown, apiKey: string) {
+async function postMistral(
+  path: string,
+  body: unknown,
+  apiKey: string,
+  context: MistralRequestContext = {},
+) {
   const res = await fetch(`https://api.mistral.ai/v1/${path}`, {
     method: "POST",
     headers: {
@@ -203,22 +222,37 @@ async function postMistral(path: string, body: unknown, apiKey: string) {
     },
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(`Mistral ${path} ${res.status}: ${await res.text()}`);
+  if (!res.ok) {
+    const responseText = await res.text();
+    console.error("[mistral] request failed", {
+      path,
+      status: res.status,
+      responseText,
+      pdfUrl: context.pdfUrl ?? null,
+      jobId: context.jobId ?? null,
+      jobTitle: context.jobTitle ?? null,
+    });
+    throw new Error(`Mistral ${path} ${res.status}: ${responseText}`);
+  }
   return res.json();
 }
 
-export async function parsePdfWithMistral(pdfUrl: string): Promise<ParsedPdfRequirements | null> {
+export async function parsePdfWithMistral(
+  pdfUrl: string,
+  context: Omit<MistralRequestContext, "pdfUrl"> = {},
+): Promise<ParsedPdfRequirements | null> {
   const apiKey = process.env.MISTRAL_API_KEY;
   if (!apiKey) return null;
 
-  const ocrData = (await postMistral(
-    "ocr",
-    {
-      model: "mistral-ocr-latest",
-      document: { type: "url", url: pdfUrl },
-    },
-    apiKey,
-  )) as { pages?: Array<{ markdown?: string }> };
+  const requestBody: MistralDocumentUrlRequest = {
+    model: "mistral-ocr-latest",
+    document: { type: "document_url", document_url: pdfUrl },
+  };
+
+  const requestContext = { ...context, pdfUrl };
+  const ocrData = (await postMistral("ocr", requestBody, apiKey, requestContext)) as {
+    pages?: Array<{ markdown?: string }>;
+  };
 
   const fullText =
     ocrData.pages
@@ -262,6 +296,7 @@ ${fullText.slice(0, 12000)}`;
       messages: [{ role: "user", content: prompt }],
     },
     apiKey,
+    requestContext,
   )) as { choices?: Array<{ message?: { content?: string } }> };
 
   const content = chatData.choices?.[0]?.message?.content ?? "";
@@ -379,7 +414,10 @@ export async function crawlGovernmentJobs(limit: number, triggeredBy?: string) {
         try {
           await delay(1000);
           ocrAttempts += 1;
-          parsed = await parsePdfWithMistral(pdfUrl);
+          parsed = await parsePdfWithMistral(pdfUrl, {
+            jobId: detail.id,
+            jobTitle: detail.job_title,
+          });
           status = requirementsStatus(parsed);
           if (parsed && status !== "unknown") enriched += 1;
           if (!parsed || status === "unknown") {

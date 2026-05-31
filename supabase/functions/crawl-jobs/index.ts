@@ -27,6 +27,20 @@ const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
 
+type MistralDocumentUrlRequest = {
+  model: "mistral-ocr-latest";
+  document: {
+    type: "document_url";
+    document_url: string;
+  };
+};
+
+type MistralRequestContext = {
+  pdfUrl?: string | null;
+  jobId?: string | number | null;
+  jobTitle?: string | null;
+};
+
 function resolveTeletalkMediaUrl(value?: string | null): string | null {
   const trimmed = value?.trim();
   if (!trimmed) return null;
@@ -103,7 +117,7 @@ function extractJsonObject(text: string): unknown {
   return JSON.parse(unfenced.slice(start, end + 1));
 }
 
-async function postMistral(path: string, body: unknown) {
+async function postMistral(path: string, body: unknown, context: MistralRequestContext = {}) {
   if (!MISTRAL_API_KEY) return null;
   const res = await fetch(`https://api.mistral.ai/v1/${path}`, {
     method: "POST",
@@ -113,7 +127,18 @@ async function postMistral(path: string, body: unknown) {
     },
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(`Mistral ${path} ${res.status}: ${await res.text()}`);
+  if (!res.ok) {
+    const responseText = await res.text();
+    console.error("[mistral] request failed", {
+      path,
+      status: res.status,
+      responseText,
+      pdfUrl: context.pdfUrl ?? null,
+      jobId: context.jobId ?? null,
+      jobTitle: context.jobTitle ?? null,
+    });
+    throw new Error(`Mistral ${path} ${res.status}: ${responseText}`);
+  }
   return res.json();
 }
 
@@ -136,12 +161,19 @@ function normalizeParsedPdf(value: unknown, ocrText: string) {
   };
 }
 
-async function parsePdfWithMistral(pdfUrl: string) {
+async function parsePdfWithMistral(
+  pdfUrl: string,
+  context: Omit<MistralRequestContext, "pdfUrl"> = {},
+) {
   if (!MISTRAL_API_KEY) return null;
-  const ocrData = await postMistral("ocr", {
+
+  const requestBody: MistralDocumentUrlRequest = {
     model: "mistral-ocr-latest",
-    document: { type: "url", url: pdfUrl },
-  });
+    document: { type: "document_url", document_url: pdfUrl },
+  };
+
+  const requestContext = { ...context, pdfUrl };
+  const ocrData = await postMistral("ocr", requestBody, requestContext);
   const fullText =
     ocrData?.pages
       ?.map((p: any) => p.markdown)
@@ -174,11 +206,15 @@ Rules:
 Circular text:
 ${fullText.slice(0, 12000)}`;
 
-  const chatData = await postMistral("chat/completions", {
-    model: "mistral-small-latest",
-    response_format: { type: "json_object" },
-    messages: [{ role: "user", content: prompt }],
-  });
+  const chatData = await postMistral(
+    "chat/completions",
+    {
+      model: "mistral-small-latest",
+      response_format: { type: "json_object" },
+      messages: [{ role: "user", content: prompt }],
+    },
+    requestContext,
+  );
   const content = chatData?.choices?.[0]?.message?.content ?? "";
   const parsed = extractJsonObject(content);
   return parsed ? normalizeParsedPdf(parsed, fullText) : null;
@@ -278,7 +314,10 @@ async function runCrawl(limit: number) {
         try {
           await delay(1000);
           ocrAttempts += 1;
-          parsed = await parsePdfWithMistral(pdfUrl);
+          parsed = await parsePdfWithMistral(pdfUrl, {
+            jobId: detail.id,
+            jobTitle: detail.job_title,
+          });
           status = requirementsStatus(parsed);
           if (parsed && status !== "unknown") enriched += 1;
         } catch (e) {

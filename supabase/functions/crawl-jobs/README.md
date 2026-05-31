@@ -13,6 +13,18 @@ admin crawler:
    quota, vacancy, and fee fields.
 6. Upsert into `public.jobs` using `external_job_id = teletalk:{id}`.
 
+The OCR request sends the PDF as:
+
+```json
+{
+  "model": "mistral-ocr-latest",
+  "document": {
+    "type": "document_url",
+    "document_url": "https://alljobs.teletalk.com.bd/media/..."
+  }
+}
+```
+
 Firecrawl is not required.
 
 ## Required Secrets
