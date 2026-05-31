@@ -169,25 +169,36 @@ export async function recomputeMatchesForUser(userId: string) {
     .maybeSingle();
   if (!profile) return { count: 0 };
 
-  const [{ data: education }, { data: experience }, { data: jobs }] = await Promise.all([
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  function isActive(deadline: unknown): boolean {
+    if (!deadline) return true;
+    const d = new Date(String(deadline));
+    if (isNaN(d.getTime())) return true;
+    return d.getTime() >= today.getTime();
+  }
+
+  const [{ data: education }, { data: experience }, { data: allJobs }] = await Promise.all([
     supabaseAdmin.from("education").select("*").eq("profile_id", profile.id),
     supabaseAdmin.from("experience").select("*").eq("profile_id", profile.id),
     supabaseAdmin.from("jobs").select("*"),
   ]);
+  const jobs = (allJobs ?? []).filter((j) => isActive((j as { deadline?: string }).deadline));
 
   const rows = buildMatchRows({
     userId,
     profile,
     education: education ?? [],
     experience: experience ?? [],
-    jobs: jobs ?? [],
+    jobs,
   });
 
-  // Pre-generate explanations for top scoring rows (eligible + partial) to keep cost bounded.
+  // Pre-generate explanations for only the top 10 eligible/partial matches.
   const explainCandidates = rows
     .map((r, idx) => ({ r, idx }))
     .filter(({ r }) => r.eligibility_status !== "not_eligible")
-    .slice(0, 40); // cap
+    .sort((a, b) => b.r.score - a.r.score)
+    .slice(0, 10);
 
   const explanations = await mapWithConcurrency(explainCandidates, 4, async ({ r }) => {
     return explainEligibilityMatch({

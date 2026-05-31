@@ -100,7 +100,6 @@ function Dashboard() {
   const all = (matches.data?.matches ?? []) as MatchRow[];
   const eligible = all.filter((m) => m.eligibility_status === "eligible");
   const partial = all.filter((m) => m.eligibility_status === "partial");
-  const not = all.filter((m) => m.eligibility_status === "not_eligible");
   const best = all.length ? Math.max(...all.map((m) => m.score)) : 0;
 
   return (
@@ -172,8 +171,8 @@ function Dashboard() {
       ) : (
         <div className="space-y-8">
           <Section
-            title="Ready to apply"
-            items={eligible}
+            title="Top eligible matches"
+            items={eligible.slice(0, 3)}
             tone="success"
             toggleFn={toggleFn}
             explainFn={explainFn}
@@ -181,20 +180,20 @@ function Dashboard() {
           />
           <Section
             title="Worth reviewing"
-            items={partial}
+            items={partial.slice(0, 3)}
             tone="warning"
             toggleFn={toggleFn}
             explainFn={explainFn}
             qc={qc}
           />
-          <Section
-            title="Likely not eligible"
-            items={not}
-            tone="muted"
-            toggleFn={toggleFn}
-            explainFn={explainFn}
-            qc={qc}
-          />
+          <div className="flex flex-wrap justify-center gap-2 pt-2">
+            <Link to="/jobs">
+              <Button>Browse all jobs</Button>
+            </Link>
+            <Link to="/onboarding">
+              <Button variant="outline">Update profile</Button>
+            </Link>
+          </div>
         </div>
       )}
     </div>
