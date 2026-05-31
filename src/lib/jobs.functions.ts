@@ -40,5 +40,16 @@ export const crawlJobs = createServerFn({ method: "POST" })
     if (!adminEmail || email !== adminEmail) {
       throw new Error("Unauthorized");
     }
-    return crawlGovernmentJobs(data.limit);
+    return crawlGovernmentJobs(data.limit, userData.user?.id);
+  });
+
+export const latestCrawlRun = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const adminEmail = process.env.ADMIN_EMAIL;
+    const { data: userData } = await context.supabase.auth.getUser();
+    if (!adminEmail || userData.user?.email !== adminEmail) {
+      throw new Error("Unauthorized");
+    }
+    return getLatestCrawlRun();
   });
