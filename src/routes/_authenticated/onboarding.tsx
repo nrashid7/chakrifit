@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Upload, Loader2, Sparkles, Check } from "lucide-react";
+import { Upload, Loader2, Sparkles, Check, Plus, X } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/onboarding")({
   head: () => ({ meta: [{ title: "Get started · ChakriFit" }] }),
@@ -28,7 +28,7 @@ function Onboarding() {
 
   const existing = useQuery({ queryKey: ["profile"], queryFn: () => profileFn() });
 
-  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [processing, setProcessing] = useState(false);
   const [resumePath, setResumePath] = useState<string | null>(null);
   const [extractedText, setExtractedText] = useState<string | null>(null);
@@ -74,6 +74,7 @@ function Onboarding() {
 
   const finish = useMutation({
     mutationFn: async () => {
+      setStep(4);
       return saveFn({
         data: {
           full_name: fullName || null,
@@ -82,17 +83,21 @@ function Onboarding() {
           skills: skills.split(",").map((s) => s.trim()).filter(Boolean),
           resume_path: resumePath,
           extracted_resume_text: extractedText,
-          education: education.map((e) => ({
-            degree: e.degree || null,
-            subject: e.subject || null,
-            institution: e.institution || null,
-            graduation_year: e.graduation_year ? Number(e.graduation_year) : null,
-          })),
-          experience: experience.map((x) => ({
-            title: x.title || null,
-            company: x.company || null,
-            years: x.years == null ? null : Number(x.years),
-          })),
+          education: education
+            .filter((e) => e.degree || e.subject || e.institution || e.graduation_year)
+            .map((e) => ({
+              degree: e.degree || null,
+              subject: e.subject || null,
+              institution: e.institution || null,
+              graduation_year: e.graduation_year ? Number(e.graduation_year) : null,
+            })),
+          experience: experience
+            .filter((x) => x.title || x.company || x.years)
+            .map((x) => ({
+              title: x.title || null,
+              company: x.company || null,
+              years: x.years == null ? null : Number(x.years),
+            })),
         },
       });
     },
@@ -102,8 +107,20 @@ function Onboarding() {
       toast.success(`Found ${r.matchCount ?? 0} jobs scored against your profile`);
       navigate({ to: "/dashboard" });
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => {
+      toast.error(e.message);
+      setStep(3);
+    },
   });
+
+  function handleFindJobs() {
+    const validEdu = education.filter((e) => e.degree || e.subject || e.institution || e.graduation_year);
+    if (validEdu.length === 0) {
+      toast.error("Please add at least one education entry before continuing.");
+      return;
+    }
+    finish.mutate();
+  }
 
   // If user has a parsed profile already, jump them to dashboard
   if (existing.data?.profile && existing.data.education.length > 0 && step === 1 && !processing) {
@@ -142,6 +159,14 @@ function Onboarding() {
         </div>
       )}
 
+      {step === 4 && (
+        <div className="rounded-2xl border bg-card p-10 text-center">
+          <Loader2 className="h-6 w-6 animate-spin text-primary mx-auto" />
+          <p className="mt-3 font-medium">Matching your profile to government jobs…</p>
+          <p className="text-xs text-muted-foreground mt-1">Scoring every circular and generating explanations.</p>
+        </div>
+      )}
+
       {step === 3 && (
         <div className="space-y-5">
           <div>
@@ -161,33 +186,51 @@ function Onboarding() {
           </div>
 
           <div className="space-y-2">
-            <Label>Education</Label>
-            {education.length === 0 && <p className="text-xs text-muted-foreground">None detected. Add at least one in the Profile page later.</p>}
+            <div className="flex items-center justify-between">
+              <Label>Education <span className="text-destructive">*</span></Label>
+              <Button type="button" variant="outline" size="sm" onClick={() => setEducation([...education, {}])} className="gap-1">
+                <Plus className="h-3 w-3" /> Add
+              </Button>
+            </div>
+            {education.length === 0 && (
+              <p className="text-xs text-destructive">Add at least one education entry to continue.</p>
+            )}
             {education.map((e, i) => (
-              <div key={i} className="grid gap-2 sm:grid-cols-4">
+              <div key={i} className="grid gap-2 sm:grid-cols-[1fr_1fr_1fr_80px_auto]">
                 <Input placeholder="Degree" value={e.degree ?? ""} onChange={(v) => setEducation(education.map((x, j) => j === i ? { ...x, degree: v.target.value } : x))} />
                 <Input placeholder="Subject" value={e.subject ?? ""} onChange={(v) => setEducation(education.map((x, j) => j === i ? { ...x, subject: v.target.value } : x))} />
                 <Input placeholder="Institution" value={e.institution ?? ""} onChange={(v) => setEducation(education.map((x, j) => j === i ? { ...x, institution: v.target.value } : x))} />
                 <Input type="number" placeholder="Year" value={e.graduation_year ?? ""} onChange={(v) => setEducation(education.map((x, j) => j === i ? { ...x, graduation_year: v.target.value ? Number(v.target.value) : null } : x))} />
+                <Button type="button" variant="ghost" size="icon" onClick={() => setEducation(education.filter((_, j) => j !== i))}>
+                  <X className="h-4 w-4" />
+                </Button>
               </div>
             ))}
           </div>
 
           <div className="space-y-2">
-            <Label>Experience</Label>
-            {experience.length === 0 && <p className="text-xs text-muted-foreground">None detected.</p>}
+            <div className="flex items-center justify-between">
+              <Label>Experience</Label>
+              <Button type="button" variant="outline" size="sm" onClick={() => setExperience([...experience, {}])} className="gap-1">
+                <Plus className="h-3 w-3" /> Add
+              </Button>
+            </div>
+            {experience.length === 0 && <p className="text-xs text-muted-foreground">None detected — optional.</p>}
             {experience.map((e, i) => (
-              <div key={i} className="grid gap-2 sm:grid-cols-3">
+              <div key={i} className="grid gap-2 sm:grid-cols-[1fr_1fr_80px_auto]">
                 <Input placeholder="Title" value={e.title ?? ""} onChange={(v) => setExperience(experience.map((x, j) => j === i ? { ...x, title: v.target.value } : x))} />
                 <Input placeholder="Company" value={e.company ?? ""} onChange={(v) => setExperience(experience.map((x, j) => j === i ? { ...x, company: v.target.value } : x))} />
                 <Input type="number" step="0.5" placeholder="Years" value={e.years ?? ""} onChange={(v) => setExperience(experience.map((x, j) => j === i ? { ...x, years: v.target.value ? Number(v.target.value) : null } : x))} />
+                <Button type="button" variant="ghost" size="icon" onClick={() => setExperience(experience.filter((_, j) => j !== i))}>
+                  <X className="h-4 w-4" />
+                </Button>
               </div>
             ))}
           </div>
 
           <div className="pt-4 border-t flex justify-between items-center">
             <p className="text-xs text-muted-foreground">Step 4 happens automatically — we'll score every job for you.</p>
-            <Button size="lg" onClick={() => finish.mutate()} disabled={finish.isPending} className="gap-2">
+            <Button size="lg" onClick={handleFindJobs} disabled={finish.isPending} className="gap-2">
               {finish.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
               Find my jobs
             </Button>
@@ -208,12 +251,12 @@ function Stepper({ step }: { step: number }) {
   return (
     <ol className="flex items-center gap-2 text-xs">
       {items.map((it, i) => {
-        const done = step > it.n || (step === 3 && it.n <= 3);
-        const active = step === it.n || (step === 3 && it.n === 3);
+        const done = step > it.n;
+        const active = step === it.n;
         return (
           <li key={it.n} className="flex items-center gap-2">
             <span className={`inline-flex h-6 w-6 items-center justify-center rounded-full border ${active ? "bg-primary text-primary-foreground border-primary" : done ? "bg-success text-success-foreground border-success" : "bg-muted text-muted-foreground"}`}>
-              {done && !active ? <Check className="h-3 w-3" /> : it.n}
+              {done ? <Check className="h-3 w-3" /> : it.n}
             </span>
             <span className={active ? "font-medium" : "text-muted-foreground"}>{it.label}</span>
             {i < items.length - 1 && <span className="text-muted-foreground">→</span>}
