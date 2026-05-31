@@ -89,7 +89,9 @@ export async function crawlGovernmentJobs(limit: number) {
   const results: { url: string; ok: boolean; error?: string }[] = [];
   for (const url of toScrape) {
     try {
-      const scraped = await firecrawl.scrape(url, { formats: ["markdown"], onlyMainContent: true });
+      const scraped = await firecrawlWithFallback((c) =>
+        c.scrape(url, { formats: ["markdown"], onlyMainContent: true }),
+      );
       const markdown =
         (scraped as { markdown?: string }).markdown ??
         (scraped as { data?: { markdown?: string } }).data?.markdown ??
