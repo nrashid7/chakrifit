@@ -153,6 +153,14 @@ function Onboarding() {
     finish.mutate();
   }
 
+  if (existing.isLoading) {
+    return (
+      <div className="mx-auto max-w-5xl py-16 text-center text-muted-foreground">
+        <Loader2 className="mx-auto h-5 w-5 animate-spin text-primary" />
+        <p className="mt-3 text-sm">Loading your profile...</p>
+      </div>
+    );
+  }
   if (existing.data?.profile && existing.data.education.length > 0 && step === 1 && !processing) {
     navigate({ to: "/dashboard", replace: true });
     return null;
