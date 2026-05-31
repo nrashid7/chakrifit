@@ -124,6 +124,10 @@ export const explainMatch = createServerFn({ method: "POST" })
 
     const gateway = createLovableAiGatewayProvider(requireLovableApiKey());
     const model = gateway("google/gemini-3-flash-preview");
+    const reasons = (match.reasons ?? { positives: [], negatives: [] }) as {
+      positives?: string[];
+      negatives?: string[];
+    };
     const { text } = await generateText({
       model,
       system:
@@ -133,8 +137,8 @@ export const explainMatch = createServerFn({ method: "POST" })
       prompt:
         `Job: ${match.job.title} at ${match.job.organization ?? "—"}\n` +
         `Status: ${match.eligibility_status} (score ${match.score}/100)\n\n` +
-        `Why you match:\n${(match.reasons?.positives ?? []).map((p: string) => `- ${p}`).join("\n")}\n\n` +
-        `Why you may not:\n${(match.reasons?.negatives ?? []).map((p: string) => `- ${p}`).join("\n")}\n\n` +
+        `Why you match:\n${(reasons.positives ?? []).map((p) => `- ${p}`).join("\n")}\n\n` +
+        `Why you may not:\n${(reasons.negatives ?? []).map((p) => `- ${p}`).join("\n")}\n\n` +
         `Write the final user-facing explanation now.`,
     });
 

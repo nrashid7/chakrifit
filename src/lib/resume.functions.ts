@@ -103,7 +103,7 @@ export const saveProfile = createServerFn({ method: "POST" })
       skills: data.skills ?? [],
       resume_path: data.resume_path ?? null,
       extracted_resume_text: data.extracted_resume_text ?? null,
-      parsed_json: data.parsed_json ?? null,
+      parsed_json: (data.parsed_json ?? null) as never,
     };
 
     const { data: upserted, error } = await supabase
