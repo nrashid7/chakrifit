@@ -84,8 +84,14 @@ function Dashboard() {
   });
   const crawl = useMutation({
     mutationFn: () => crawlFn({ data: { limit: 8 } }),
-    onSuccess: (r) => toast.success(`Crawled ${r.results.filter((x) => x.ok).length} new jobs`),
-    onError: (e: Error) => toast.error(e.message),
+    onSuccess: (r) => {
+      toast.success(`Crawled ${r.succeeded} new jobs`);
+      qc.invalidateQueries({ queryKey: ["latest-crawl-run"] });
+    },
+    onError: (e: Error) => {
+      toast.error(e.message);
+      qc.invalidateQueries({ queryKey: ["latest-crawl-run"] });
+    },
   });
 
   if (profile.isLoading) return <DashboardSkeleton />;
