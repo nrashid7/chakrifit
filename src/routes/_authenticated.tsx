@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import {
   Bookmark,
   BriefcaseBusiness,
+  LayoutDashboard,
   LogOut,
   Settings as SettingsIcon,
   UserRound,
