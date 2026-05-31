@@ -111,10 +111,7 @@ function Onboarding() {
           resume_path: resumePath,
           extracted_resume_text: extractedText,
           education: education
-            .filter(
-              (e) =>
-                (e.degree && e.degree.trim()) || (e.subject && e.subject.trim()),
-            )
+            .filter((e) => (e.degree && e.degree.trim()) || (e.subject && e.subject.trim()))
             .map((e) => ({
               degree: e.degree || null,
               subject: e.subject || null,
