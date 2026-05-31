@@ -506,59 +506,93 @@ type CrawlRun = {
   errors: { url: string; error: string }[] | null;
 };
 
-function CrawlStatusPanel({
-  run,
-  isLoading,
-  isRunning,
-}: {
-  run: CrawlRun | null;
-  isLoading: boolean;
-  isRunning: boolean;
-}) {
-  const errors = Array.isArray(run?.errors) ? run!.errors : [];
-  const lastRunLabel = run?.started_at
-    ? new Date(run.started_at).toLocaleString()
-    : isLoading
-      ? "Loading..."
-      : "Never";
-  const status = isRunning
-    ? { label: "Running...", tone: "warning" as const, Icon: Loader2, spin: true }
-    : run && errors.length === 0 && run.failed === 0
-      ? { label: "Healthy", tone: "success" as const, Icon: CheckCircle2, spin: false }
-      : run
-        ? { label: "Issues", tone: "warning" as const, Icon: AlertTriangle, spin: false }
-        : { label: "No runs yet", tone: "muted" as const, Icon: RefreshCw, spin: false };
+const STATUS_META: Record<
+  CrawlStatus | "none",
+  { label: string; tone: "success" | "warning" | "muted" | "danger"; Icon: typeof Loader2; spin: boolean }
+> = {
+  queued: { label: "Queued", tone: "muted", Icon: RefreshCw, spin: false },
+  running: { label: "Running", tone: "warning", Icon: Loader2, spin: true },
+  completed: { label: "Completed", tone: "success", Icon: CheckCircle2, spin: false },
+  cancelled: { label: "Cancelled", tone: "muted", Icon: AlertTriangle, spin: false },
+  failed: { label: "Failed", tone: "danger", Icon: AlertTriangle, spin: false },
+  none: { label: "No runs yet", tone: "muted", Icon: RefreshCw, spin: false },
+};
 
-  const StatusIcon = status.Icon;
+function formatTime(value?: string | null) {
+  return value ? new Date(value).toLocaleString() : "—";
+}
+
+function CrawlStatusPanel({ run, isLoading }: { run: CrawlRun | null; isLoading: boolean }) {
+  const errors = Array.isArray(run?.errors) ? run!.errors.filter((e) => e.url !== "strategy") : [];
+  const meta = STATUS_META[run?.status ?? "none"];
+  const StatusIcon = meta.Icon;
   const toneClass =
-    status.tone === "success"
+    meta.tone === "success"
       ? "text-success"
-      : status.tone === "warning"
+      : meta.tone === "warning"
         ? "text-warning-foreground"
-        : "text-muted-foreground";
+        : meta.tone === "danger"
+          ? "text-destructive"
+          : "text-muted-foreground";
+
+  const total = run?.discovered ?? 0;
+  const done = run?.attempted ?? 0;
+  const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;
+  const isLive = run?.status === "running" || run?.status === "queued";
 
   return (
     <section className="rounded-2xl border bg-card p-5 shadow-sm sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-xs font-medium uppercase text-muted-foreground">Crawler status</p>
-          <h2 className="mt-1 text-lg font-semibold">Last run: {lastRunLabel}</h2>
+          <h2 className="mt-1 text-lg font-semibold">
+            {isLoading ? "Loading..." : run?.progress_message ?? "No crawl runs yet"}
+          </h2>
         </div>
         <Badge variant="outline" className={`gap-2 ${toneClass}`}>
-          <StatusIcon className={`h-3.5 w-3.5 ${status.spin ? "animate-spin" : ""}`} />
-          {status.label}
+          <StatusIcon className={`h-3.5 w-3.5 ${meta.spin ? "animate-spin" : ""}`} />
+          {meta.label}
         </Badge>
       </div>
+
+      {run && (
+        <div className="mt-4 grid gap-3 text-xs text-muted-foreground sm:grid-cols-3">
+          <div>
+            <p className="font-medium uppercase">Started</p>
+            <p className="mt-1 text-sm text-foreground">{formatTime(run.started_at)}</p>
+          </div>
+          <div>
+            <p className="font-medium uppercase">{isLive ? "Last update" : "Finished"}</p>
+            <p className="mt-1 text-sm text-foreground">
+              {formatTime(isLive ? run.updated_at ?? run.started_at : run.finished_at)}
+            </p>
+          </div>
+          <div>
+            <p className="font-medium uppercase">Progress</p>
+            <p className="mt-1 text-sm text-foreground">
+              {done} / {total || "?"} {total > 0 ? `(${pct}%)` : ""}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {run && total > 0 && (
+        <div className="mt-4">
+          <Progress value={pct} />
+        </div>
+      )}
+
       <div className="mt-5 grid gap-3 sm:grid-cols-4">
         <Metric label="URLs found" value={run?.discovered ?? 0} />
-        <Metric label="Scrape attempts" value={run?.attempted ?? 0} />
+        <Metric label="Attempts" value={run?.attempted ?? 0} />
         <Metric label="Saved" value={run?.succeeded ?? 0} tone="success" />
         <Metric
           label="Errors"
-          value={run?.failed ?? errors.length}
-          tone={errors.length > 0 || (run?.failed ?? 0) > 0 ? "warning" : undefined}
+          value={run?.failed ?? 0}
+          tone={(run?.failed ?? 0) > 0 ? "warning" : undefined}
         />
       </div>
+
       {errors.length > 0 && (
         <div className="mt-5">
           <p className="text-xs font-medium uppercase text-muted-foreground">
