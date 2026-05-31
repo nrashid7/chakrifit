@@ -22,9 +22,12 @@ export type Database = {
           failed: number
           finished_at: string | null
           id: string
+          progress_message: string | null
           started_at: string
+          status: string
           succeeded: number
           triggered_by: string | null
+          updated_at: string
         }
         Insert: {
           attempted?: number
@@ -33,9 +36,12 @@ export type Database = {
           failed?: number
           finished_at?: string | null
           id?: string
+          progress_message?: string | null
           started_at?: string
+          status?: string
           succeeded?: number
           triggered_by?: string | null
+          updated_at?: string
         }
         Update: {
           attempted?: number
@@ -44,9 +50,12 @@ export type Database = {
           failed?: number
           finished_at?: string | null
           id?: string
+          progress_message?: string | null
           started_at?: string
+          status?: string
           succeeded?: number
           triggered_by?: string | null
+          updated_at?: string
         }
         Relationships: []
       }
