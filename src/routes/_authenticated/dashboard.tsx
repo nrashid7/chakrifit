@@ -8,6 +8,7 @@ import { toggleSave } from "@/lib/saved.functions";
 import { crawlJobs, amIAdmin, latestCrawlRun, cancelCrawlRun } from "@/lib/jobs.functions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import {
