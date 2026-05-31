@@ -1,7 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { crawlGovernmentJobs, getJobFromDb, listJobsFromDb } from "./jobs.server";
+import {
+  crawlGovernmentJobs,
+  getJobFromDb,
+  getLatestCrawlRun,
+  listJobsFromDb,
+} from "./jobs.server";
 
 export const listJobs = createServerFn({ method: "GET" }).handler(async () => {
   return listJobsFromDb();
