@@ -32,12 +32,12 @@ export const computeMatches = createServerFn({ method: "POST" })
 
     if (rows.length === 0) return { count: 0 };
 
-    // Wipe & insert in chunks to be safe
-    await supabase.from("matches").delete().eq("user_id", userId);
+    // Wipe & insert via admin client (matches is read-only for users via RLS)
+    await supabaseAdmin.from("matches").delete().eq("user_id", userId);
     const CHUNK = 100;
     for (let i = 0; i < rows.length; i += CHUNK) {
       const slice = rows.slice(i, i + CHUNK);
-      const { error } = await supabase.from("matches").insert(slice);
+      const { error } = await supabaseAdmin.from("matches").insert(slice);
       if (error) throw new Error(error.message);
     }
 
