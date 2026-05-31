@@ -43,14 +43,36 @@ async function parseCircularToJob(markdown: string, sourceUrl: string): Promise<
   return output;
 }
 
+function getFirecrawlKeys(): string[] {
+  const keys = Object.entries(process.env)
+    .filter(([k, v]) => /^FIRECRAWL_API_KEY(_\d+)?$/.test(k) && typeof v === "string" && v.length > 0)
+    .map(([, v]) => v as string);
+  return Array.from(new Set(keys));
+}
+
+async function firecrawlWithFallback<T>(fn: (client: Firecrawl) => Promise<T>): Promise<T> {
+  const keys = getFirecrawlKeys();
+  if (keys.length === 0) throw new Error("Firecrawl is not connected");
+  let lastError: unknown;
+  for (const apiKey of keys) {
+    try {
+      return await fn(new Firecrawl({ apiKey }));
+    } catch (error) {
+      lastError = error;
+      const message = error instanceof Error ? error.message : String(error);
+      if (!/unauthorized|invalid token|forbidden/i.test(message)) throw error;
+      console.warn("Firecrawl key rejected, trying next key");
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error(String(lastError));
+}
+
 export async function crawlGovernmentJobs(limit: number) {
-  const apiKey = process.env.FIRECRAWL_API_KEY;
-  if (!apiKey) throw new Error("Firecrawl is not connected");
-  const firecrawl = new Firecrawl({ apiKey });
+  if (getFirecrawlKeys().length === 0) throw new Error("Firecrawl is not connected");
 
   let urls: string[] = [];
   try {
-    const mapped = await firecrawl.map(TELETALK_INDEX, { limit: 200 });
+    const mapped = await firecrawlWithFallback((c) => c.map(TELETALK_INDEX, { limit: 200 }));
     const links = (mapped as { links?: Array<string | { url: string }> }).links ?? [];
     urls = links
       .map((link) => (typeof link === "string" ? link : link.url))
@@ -67,7 +89,9 @@ export async function crawlGovernmentJobs(limit: number) {
   const results: { url: string; ok: boolean; error?: string }[] = [];
   for (const url of toScrape) {
     try {
-      const scraped = await firecrawl.scrape(url, { formats: ["markdown"], onlyMainContent: true });
+      const scraped = await firecrawlWithFallback((c) =>
+        c.scrape(url, { formats: ["markdown"], onlyMainContent: true }),
+      );
       const markdown =
         (scraped as { markdown?: string }).markdown ??
         (scraped as { data?: { markdown?: string } }).data?.markdown ??
