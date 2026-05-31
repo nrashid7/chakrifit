@@ -114,9 +114,9 @@ function Onboarding() {
   });
 
   function handleFindJobs() {
-    const validEdu = education.filter((e) => e.degree || e.subject || e.institution || e.graduation_year);
+    const validEdu = education.filter((e) => (e.degree && e.degree.trim()) || (e.subject && e.subject.trim()));
     if (validEdu.length === 0) {
-      toast.error("Please add at least one education entry before continuing.");
+      toast.error("Add at least one education entry with a degree or subject. Institution or year alone is not enough.");
       return;
     }
     finish.mutate();
