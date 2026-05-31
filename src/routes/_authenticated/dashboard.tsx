@@ -148,6 +148,16 @@ function Dashboard() {
         </div>
       </section>
 
+      {isAdmin && (
+        <CrawlStatusPanel
+          run={latestRun.data?.run ?? null}
+          isLoading={latestRun.isLoading}
+          isRunning={crawl.isPending}
+        />
+      )}
+
+
+
       {all.length === 0 ? (
         <EmptyMatches
           isAdmin={isAdmin}
