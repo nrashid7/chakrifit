@@ -2,32 +2,29 @@
 
 Daily background crawler for Bangladesh government job circulars.
 
-> **Admin note:** This daily crawler is **not active by default**. It only runs
-> once you execute the `pg_cron` SQL snippet at the bottom of this file inside
-> your Supabase project (SQL editor). Until then, new circulars only arrive via
-> the in-app "Fetch new circulars" button on the dashboard, which calls the
-> internal server crawler directly (no `CRON_SECRET` needed).
+This scheduled function uses the same official-source strategy as the in-app
+admin crawler:
 
-## What it does
+1. Fetch jobs from the public Teletalk Alljobs API.
+2. Fetch each official public-details payload.
+3. Resolve `advertisement_file` to the official Teletalk PDF under `/media/`.
+4. Use Mistral OCR to extract PDF markdown.
+5. Use Mistral Small JSON mode to extract education, experience, age, salary,
+   quota, vacancy, and fee fields.
+6. Upsert into `public.jobs` using `external_job_id = teletalk:{id}`.
 
-1. Calls Firecrawl `/v2/map` to discover circular URLs under the Teletalk
-   government jobs index.
-2. Skips URLs already present in `public.jobs.external_job_id`.
-3. For each new URL: scrapes with Firecrawl, sends markdown to Lovable AI
-   Gateway (Gemini) for structured parsing, then **upserts** into
-   `public.jobs` keyed on `external_job_id`. Safe to run repeatedly.
+Firecrawl is not required.
 
-## Required secrets
+## Required Secrets
 
-- `FIRECRAWL_API_KEY` — Firecrawl connector
-- `LOVABLE_API_KEY` — Lovable AI Gateway
-- `CRON_SECRET` — shared secret; callers must send it as the `x-cron-secret` header
-- `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` — injected automatically
+- `MISTRAL_API_KEY`: Mistral OCR and Mistral Small extraction.
+- `CRON_SECRET`: shared secret; callers must send it as `x-cron-secret`.
+- `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`: injected automatically by
+  Supabase in most projects, but verify they exist.
 
-The function rejects any request that does not present a matching
-`x-cron-secret` header with `401 Unauthorized`.
+The function rejects requests without a matching `x-cron-secret` header.
 
-## Manual invocation
+## Manual Invocation
 
 ```bash
 curl -X POST 'https://<project-ref>.supabase.co/functions/v1/crawl-jobs' \
@@ -37,7 +34,7 @@ curl -X POST 'https://<project-ref>.supabase.co/functions/v1/crawl-jobs' \
   -d '{"limit": 20}'
 ```
 
-## Scheduling daily with `pg_cron`
+## Scheduling Daily With `pg_cron`
 
 ```sql
 create extension if not exists pg_cron;
@@ -45,7 +42,7 @@ create extension if not exists pg_net;
 
 select cron.schedule(
   'chakrifit-crawl-daily',
-  '0 3 * * *',  -- every day at 03:00 UTC (09:00 BDT)
+  '0 3 * * *',
   $$
   select net.http_post(
     url     := 'https://<project-ref>.supabase.co/functions/v1/crawl-jobs',
@@ -66,8 +63,10 @@ To unschedule:
 select cron.unschedule('chakrifit-crawl-daily');
 ```
 
-## Deployment checklist
+## Cost Controls
 
-- Set `ADMIN_EMAIL` in Lovable Cloud → Secrets (gates the in-app manual "Fetch new circulars" button).
-- Set `CRON_SECRET` in Lovable Cloud → Secrets (gates this scheduled Edge Function).
-- Run the pg_cron SQL above inside the Supabase SQL editor to enable the daily crawl. Until then, only the admin can trigger crawls manually from the dashboard.
+- At most 20 PDFs are enriched per run.
+- Existing rows with the same `circular_pdf_url` and
+  `requirements_status = parsed` are not re-parsed.
+- OCR calls are sequential with a one second delay.
+- API-only rows are still saved if OCR fails.

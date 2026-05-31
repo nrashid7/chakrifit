@@ -39,8 +39,11 @@ type JobRow = {
   deadline: string | null;
   salary: string | null;
   circular_url: string | null;
+  parsed_json: unknown;
   created_at?: string | null;
 };
+
+type RequirementsStatus = "parsed" | "partial" | "unknown";
 
 type MatchInfo = {
   score: number;
@@ -83,7 +86,7 @@ function JobsBrowser() {
     return s;
   }, [saved.data]);
 
-  const allJobs = (jobs.data?.jobs ?? []) as JobRow[];
+  const allJobs = useMemo(() => (jobs.data?.jobs ?? []) as JobRow[], [jobs.data]);
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -114,7 +117,9 @@ function JobsBrowser() {
         return ad - bd;
       });
     } else if (sort === "score_desc") {
-      rows.sort((a, b) => (matchByJob.get(b.id)?.score ?? -1) - (matchByJob.get(a.id)?.score ?? -1));
+      rows.sort(
+        (a, b) => (matchByJob.get(b.id)?.score ?? -1) - (matchByJob.get(a.id)?.score ?? -1),
+      );
     } else {
       rows.sort((a, b) => {
         const at = a.created_at ? new Date(a.created_at).getTime() : 0;
@@ -140,8 +145,8 @@ function JobsBrowser() {
       <header className="rounded-2xl border bg-card p-5 shadow-sm sm:p-6">
         <h1 className="text-3xl font-bold">Browse government jobs</h1>
         <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-          Every circular ingested from Teletalk Alljobs. Filter by eligibility, save what
-          you want to apply for, and open the official PDF in one click.
+          Every circular ingested from Teletalk Alljobs. Filter by eligibility, save what you want
+          to apply for, and open the official PDF in one click.
         </p>
       </header>
 
@@ -203,7 +208,10 @@ function JobsBrowser() {
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       {m && (
-                        <Badge variant={m.status === "eligible" ? "default" : "outline"} className="capitalize">
+                        <Badge
+                          variant={m.status === "eligible" ? "default" : "outline"}
+                          className="capitalize"
+                        >
                           {m.status.replace("_", " ")}
                         </Badge>
                       )}
@@ -214,13 +222,16 @@ function JobsBrowser() {
                         </Badge>
                       )}
                       {j.salary && <Badge variant="outline">{j.salary}</Badge>}
+                      <RequirementsBadge status={getRequirementsStatus(j.parsed_json)} />
                     </div>
                     <Link
                       to="/jobs/$jobId"
                       params={{ jobId: j.id }}
                       className="group mt-3 inline-flex max-w-full items-center gap-2"
                     >
-                      <h3 className="truncate text-lg font-semibold group-hover:underline">{j.title}</h3>
+                      <h3 className="truncate text-lg font-semibold group-hover:underline">
+                        {j.title}
+                      </h3>
                       <ArrowRight className="h-4 w-4 shrink-0 text-primary" />
                     </Link>
                     <p className="mt-1 truncate text-sm text-muted-foreground">
@@ -229,11 +240,15 @@ function JobsBrowser() {
                   </div>
                   <div className="flex items-center justify-between gap-3 lg:flex-col lg:items-end">
                     {m && (
-                      <div className="text-3xl font-bold tabular-nums text-foreground">{m.score}%</div>
+                      <div className="text-3xl font-bold tabular-nums text-foreground">
+                        {m.score}%
+                      </div>
                     )}
                     <div className="flex flex-wrap justify-end gap-2">
                       <Link to="/jobs/$jobId" params={{ jobId: j.id }}>
-                        <Button size="sm" variant="outline">Details</Button>
+                        <Button size="sm" variant="outline">
+                          Details
+                        </Button>
                       </Link>
                       {j.circular_url && (
                         <a href={j.circular_url} target="_blank" rel="noreferrer">
@@ -264,4 +279,16 @@ function JobsBrowser() {
       )}
     </div>
   );
+}
+
+function getRequirementsStatus(value: unknown): RequirementsStatus {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return "unknown";
+  const status = (value as { requirements_status?: unknown }).requirements_status;
+  return status === "parsed" || status === "partial" || status === "unknown" ? status : "unknown";
+}
+
+function RequirementsBadge({ status }: { status: RequirementsStatus }) {
+  if (status === "parsed") return <Badge variant="secondary">Parsed requirements</Badge>;
+  if (status === "partial") return <Badge variant="outline">Partial requirements</Badge>;
+  return <Badge variant="outline">Verify circular</Badge>;
 }

@@ -20,6 +20,10 @@ import {
   Timer,
 } from "lucide-react";
 
+const UNKNOWN_REQUIREMENTS_LABEL = "Not parsed yet - verify official circular";
+
+type RequirementsStatus = "parsed" | "partial" | "unknown";
+
 export const Route = createFileRoute("/_authenticated/jobs/$jobId")({
   head: ({ params }) => ({
     meta: [
@@ -59,7 +63,9 @@ function JobDetail() {
       min_experience_years?: number | null;
       preferred_skills?: string[];
     } | null;
+    parsed_json: unknown;
   };
+  const requirementsStatus = getRequirementsStatus(j.parsed_json);
   const myMatch = matches.data?.matches?.find((m: { job_id: string }) => m.job_id === jobId) as
     | {
         id: string;
@@ -100,6 +106,7 @@ function JobDetail() {
                 </Badge>
               )}
               {j.salary && <Badge variant="outline">{j.salary}</Badge>}
+              <RequirementsBadge status={requirementsStatus} />
             </div>
             <h1 className="mt-4 text-3xl font-bold leading-tight">{j.title}</h1>
             <p className="mt-2 text-muted-foreground">
@@ -136,7 +143,7 @@ function JobDetail() {
         <Field icon={<Timer className="h-4 w-4 text-primary" />} label="Age requirement">
           {j.age_limit?.max_age || j.age_limit?.min_age
             ? `${j.age_limit?.min_age ?? "Any"} to ${j.age_limit?.max_age ?? "Any"} years`
-            : "Not specified"}
+            : requirementFallback(requirementsStatus)}
         </Field>
         <Field icon={<GraduationCap className="h-4 w-4 text-primary" />} label="Education">
           {j.education_requirements?.required_degrees?.length ? (
@@ -147,13 +154,13 @@ function JobDetail() {
                 : ""}
             </span>
           ) : (
-            "Not specified"
+            requirementFallback(requirementsStatus)
           )}
         </Field>
         <Field icon={<BriefcaseBusiness className="h-4 w-4 text-primary" />} label="Experience">
           {j.experience_requirements?.min_experience_years != null
             ? `${j.experience_requirements.min_experience_years} year(s) minimum`
-            : "Not specified"}
+            : requirementFallback(requirementsStatus)}
         </Field>
       </div>
 
@@ -192,6 +199,22 @@ function JobDetail() {
       )}
     </div>
   );
+}
+
+function getRequirementsStatus(value: unknown): RequirementsStatus {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return "unknown";
+  const status = (value as { requirements_status?: unknown }).requirements_status;
+  return status === "parsed" || status === "partial" || status === "unknown" ? status : "unknown";
+}
+
+function requirementFallback(status: RequirementsStatus) {
+  return status === "unknown" ? UNKNOWN_REQUIREMENTS_LABEL : "Not specified";
+}
+
+function RequirementsBadge({ status }: { status: RequirementsStatus }) {
+  if (status === "parsed") return <Badge variant="secondary">Parsed requirements</Badge>;
+  if (status === "partial") return <Badge variant="outline">Partial requirements</Badge>;
+  return <Badge variant="outline">Verify circular</Badge>;
 }
 
 function Field({ label, icon, children }: { label: string; icon: ReactNode; children: ReactNode }) {

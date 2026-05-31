@@ -1,51 +1,48 @@
 # ChakriFit Deployment Guide
 
-This document covers everything needed to deploy and verify a fresh ChakriFit instance.
+This document covers the secrets and checks needed to deploy a fresh ChakriFit
+instance.
 
----
+## 1. Required Lovable Secrets
 
-## 1. Required Lovable secrets
+Set these in Lovable Cloud Secrets, or the equivalent server-side secret
+manager for your runtime.
 
-Set these in **Lovable Cloud → Secrets** (or your `.env` / secret manager for server-side runtime):
+| Secret            | Purpose                                                                                                |
+| ----------------- | ------------------------------------------------------------------------------------------------------ |
+| `ADMIN_EMAIL`     | Gates the admin-only Fetch circulars button on the dashboard.                                          |
+| `MISTRAL_API_KEY` | Server-only key used by the in-app crawler to OCR official Teletalk PDFs and extract requirement JSON. |
+| `CRON_SECRET`     | Protects the scheduled Supabase Edge Function.                                                         |
 
-| Secret | Purpose |
-|--------|---------|
-| `ADMIN_EMAIL` | Gates the admin-only **Fetch new circulars** button on the dashboard. Only the user whose email matches this value can trigger a manual crawl from the app. |
-| `CRON_SECRET` | Protects the scheduled Supabase Edge Function (`crawl-jobs`). The `pg_cron` job must send this value in the `x-cron-secret` header or the Edge Function will reject the request with `401 Unauthorized`. |
+Do not expose these values in client-side code or commit real values to the
+repository.
 
-> Do not expose these values in client-side code or commit them to the repository.
+## 2. Required Supabase Edge Function Secrets
 
----
+Set these in your Supabase project dashboard under Edge Functions Secrets.
 
-## 2. Required Supabase Edge Function secrets
+| Secret                      | Purpose                                                                             |
+| --------------------------- | ----------------------------------------------------------------------------------- |
+| `MISTRAL_API_KEY`           | Used by `crawl-jobs` for Mistral OCR and Mistral Small JSON extraction.             |
+| `SUPABASE_URL`              | Supabase project URL. This may be injected automatically, but verify it is present. |
+| `SUPABASE_SERVICE_ROLE_KEY` | Service role key used by the Edge Function to upsert `public.jobs` with RLS bypass. |
+| `CRON_SECRET`               | Shared secret sent by `pg_cron` as the `x-cron-secret` header.                      |
 
-Set these in your Supabase project dashboard under **Edge Functions → Secrets**:
+Firecrawl is no longer required.
 
-| Secret | Purpose |
-|--------|---------|
-| `FIRECRAWL_API_KEY` | Used by `crawl-jobs` to call the Firecrawl `/v2/map` and scrape APIs for discovering and parsing job circulars. |
-| `LOVABLE_API_KEY` | Used by `crawl-jobs` to call the Lovable AI Gateway (Gemini) for structured extraction of circular data. |
-| `SUPABASE_URL` | The Supabase project URL. May be injected automatically depending on your Supabase setup, but verify it is present. |
-| `SUPABASE_SERVICE_ROLE_KEY` | Service role key used by the Edge Function to upsert records into `public.jobs` with RLS bypass. May be injected automatically, but verify it is present. |
-| `CRON_SECRET` | Shared secret used to authenticate requests to the Edge Function from `pg_cron` (same value as the Lovable secret above). |
+## 3. Deploy The Edge Function
 
----
-
-## 3. Deploy the Edge Function
-
-From the repository root, run:
+From the repository root:
 
 ```bash
 supabase functions deploy crawl-jobs --project-ref <your-project-ref>
 ```
 
-Replace `<your-project-ref>` with your actual Supabase project reference (e.g. `jzfgqhtcktialdrrhudb`).
+Replace `<your-project-ref>` with your Supabase project reference.
 
----
+## 4. Schedule The Daily Crawler
 
-## 4. Schedule the daily crawler
-
-Run the following SQL inside your Supabase project **SQL Editor** to enable the daily crawl:
+Run this SQL inside the Supabase SQL Editor:
 
 ```sql
 CREATE EXTENSION IF NOT EXISTS pg_cron;
@@ -53,7 +50,7 @@ CREATE EXTENSION IF NOT EXISTS pg_net;
 
 SELECT cron.schedule(
   'chakrifit-crawl-daily',
-  '0 3 * * *',  -- every day at 03:00 UTC (09:00 BDT)
+  '0 3 * * *',
   $$
   SELECT net.http_post(
     url     := 'https://<project-ref>.supabase.co/functions/v1/crawl-jobs',
@@ -68,35 +65,33 @@ SELECT cron.schedule(
 );
 ```
 
-Replace the placeholders:
-- `<project-ref>` → your Supabase project reference
-- `<SUPABASE_ANON_KEY>` → your Supabase anon/publishable key
-- `<CRON_SECRET>` → the shared CRON_SECRET value you configured above
+Replace:
 
-### Unschedule (if needed)
+- `<project-ref>` with your Supabase project reference.
+- `<SUPABASE_ANON_KEY>` with your Supabase anon/publishable key.
+- `<CRON_SECRET>` with the shared secret configured above.
+
+To unschedule:
 
 ```sql
 SELECT cron.unschedule('chakrifit-crawl-daily');
 ```
 
----
+## 5. Post-Deployment Test Checklist
 
-## 5. Post-deployment test checklist
-
-| # | Test | Expected result |
-|---|------|---------------|
-| 1 | Sign up as a normal user | Account created; redirected to onboarding. |
-| 2 | Upload resume | Resume parses successfully via AI. |
-| 3 | Confirm AI parsing works | Education and experience fields are populated from the resume. |
-| 4 | Add/edit education | Changes are saved to the user profile. |
-| 5 | Find matching jobs | Dashboard shows matched jobs with scores. |
-| 6 | Open job detail page | Job title, organization, deadline, salary, requirements, and match status are visible. |
-| 7 | Save job | Job appears in the **Saved** section. |
-| 8 | Delete resume from settings | Resume file and parsed data are removed. |
-| 9 | Confirm normal user cannot see **Fetch new circulars** | The button is hidden for non-admin users. |
-| 10 | Log in as `ADMIN_EMAIL` user | Admin user is authenticated. |
-| 11 | Confirm admin can see **Fetch new circulars** | Admin user sees the manual crawl button on the dashboard. |
-| 12 | Run manual crawl once | Crawl completes without error and new jobs are inserted/updated. |
-| 13 | Confirm daily crawler schedule exists in Supabase | `SELECT * FROM cron.job;` shows `chakrifit-crawl-daily`. |
-| 14 | Confirm `jobs` table has fresh records | Query `SELECT * FROM public.jobs ORDER BY created_at DESC LIMIT 5;` returns recent records. |
-
+| #   | Test                                           | Expected result                                                                         |
+| --- | ---------------------------------------------- | --------------------------------------------------------------------------------------- |
+| 1   | Sign up as a normal user                       | Account is created and redirected to onboarding.                                        |
+| 2   | Upload resume                                  | Resume parses successfully via AI.                                                      |
+| 3   | Add or edit education                          | Changes save to the user profile.                                                       |
+| 4   | Find matching jobs                             | Dashboard shows matched jobs with scores.                                               |
+| 5   | Open job detail page                           | Job metadata, requirements status, circular link, and match status are visible.         |
+| 6   | Save job                                       | Job appears in Saved.                                                                   |
+| 7   | Confirm normal user cannot see Fetch circulars | The admin crawler button is hidden.                                                     |
+| 8   | Log in as `ADMIN_EMAIL` user                   | Admin user is authenticated.                                                            |
+| 9   | Confirm admin can see Fetch circulars          | Admin user sees the manual crawl button.                                                |
+| 10  | Run manual crawl once                          | Crawl completes and jobs are inserted or updated.                                       |
+| 11  | Confirm a Teletalk PDF job                     | `circular_url` points to the official Teletalk PDF.                                     |
+| 12  | Confirm OCR enrichment                         | At least one parseable PDF populates education or experience requirements.              |
+| 13  | Confirm OCR fallback                           | Failed OCR still saves the job and UI says `Not parsed yet - verify official circular`. |
+| 14  | Confirm daily crawler schedule                 | `SELECT * FROM cron.job;` shows `chakrifit-crawl-daily`.                                |

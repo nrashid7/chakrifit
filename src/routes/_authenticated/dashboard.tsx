@@ -41,8 +41,11 @@ type MatchRow = {
     deadline: string | null;
     salary: string | null;
     circular_url: string | null;
+    parsed_json: unknown;
   };
 };
+
+type RequirementsStatus = "parsed" | "partial" | "unknown";
 
 function Dashboard() {
   const navigate = useNavigate();
@@ -85,7 +88,9 @@ function Dashboard() {
   const crawl = useMutation({
     mutationFn: () => crawlFn({ data: { limit: 8 } }),
     onSuccess: (r) => {
-      toast.success(`Crawled ${r.succeeded} new jobs`);
+      toast.success(`Saved or updated ${r.succeeded} jobs`);
+      qc.invalidateQueries({ queryKey: ["jobs"] });
+      qc.invalidateQueries({ queryKey: ["matches"] });
       qc.invalidateQueries({ queryKey: ["latest-crawl-run"] });
     },
     onError: (e: Error) => {
@@ -154,8 +159,6 @@ function Dashboard() {
           isRunning={crawl.isPending}
         />
       )}
-
-
 
       {all.length === 0 ? (
         <EmptyMatches
@@ -385,6 +388,7 @@ function MatchCard({
                 </Badge>
               )}
               {m.job.salary && <Badge variant="outline">{m.job.salary}</Badge>}
+              <RequirementsBadge status={getRequirementsStatus(m.job.parsed_json)} />
             </div>
             <Link
               to="/jobs/$jobId"
@@ -443,6 +447,18 @@ function MatchCard({
       </Dialog>
     </>
   );
+}
+
+function getRequirementsStatus(value: unknown): RequirementsStatus {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return "unknown";
+  const status = (value as { requirements_status?: unknown }).requirements_status;
+  return status === "parsed" || status === "partial" || status === "unknown" ? status : "unknown";
+}
+
+function RequirementsBadge({ status }: { status: RequirementsStatus }) {
+  if (status === "parsed") return <Badge variant="secondary">Parsed requirements</Badge>;
+  if (status === "partial") return <Badge variant="outline">Partial requirements</Badge>;
+  return <Badge variant="outline">Verify circular</Badge>;
 }
 
 type CrawlRun = {

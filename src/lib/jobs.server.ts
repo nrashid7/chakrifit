@@ -1,13 +1,38 @@
-import { generateText, Output } from "ai";
-import Firecrawl from "@mendable/firecrawl-js";
-
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { createLovableAiGatewayProvider, requireLovableApiKey } from "./ai-gateway.server";
-import { JobReqSchema, type ParsedJobCircular } from "./jobs.schemas";
 
 const API_BASE = "https://alljobs.teletalk.com.bd/api/v1";
 const MEDIA_BASE = "https://alljobs.teletalk.com.bd/media";
 const SITE_BASE = "https://alljobs.teletalk.com.bd";
+const MAX_PDF_ENRICHMENTS_PER_RUN = 20;
+
+type RequirementsStatus = "parsed" | "partial" | "unknown";
+
+export type ParsedPdfRequirements = {
+  required_degrees: string[];
+  required_subjects: string[];
+  min_experience_years: number | null;
+  preferred_skills: string[];
+  salary_scale: string | null;
+  quota_info: string | null;
+  min_age: number | null;
+  max_age: number | null;
+  vacancy: string | null;
+  application_fee: string | null;
+  confidence_score: number | null;
+  parse_notes: string | null;
+  ocr_text_excerpt?: string | null;
+};
+
+type CrawlError = { url: string; error: string };
+
+type ExistingJob = {
+  external_job_id: string | null;
+  parsed_json: unknown;
+  education_requirements: unknown;
+  experience_requirements: unknown;
+  salary: string | null;
+  age_limit: unknown;
+};
 
 export async function listJobsFromDb() {
   const { data, error } = await supabaseAdmin
@@ -29,45 +54,6 @@ export async function getJobFromDb(id: string) {
   return { job };
 }
 
-async function parseCircularToJob(markdown: string, sourceUrl: string): Promise<ParsedJobCircular> {
-  const gateway = createLovableAiGatewayProvider(requireLovableApiKey());
-  const model = gateway("google/gemini-3-flash-preview");
-  const { output } = await generateText({
-    model,
-    output: Output.object({ schema: JobReqSchema }),
-    system:
-      "You parse Bangladesh government job circulars (English + Bangla mix). " +
-      "Extract structured requirements. For degrees use simple labels: SSC, HSC, Diploma, Bachelor, Master, PhD. " +
-      "Subjects in lowercase (e.g. 'civil engineering', 'computer science', 'bba'). " +
-      "Return null when a field is genuinely absent — do not guess.",
-    prompt: `Parse this government job circular. Source: ${sourceUrl}\n\n${markdown.slice(0, 12000)}`,
-  });
-  return output;
-}
-
-function getFirecrawlKeys(): string[] {
-  const keys = Object.entries(process.env)
-    .filter(([k, v]) => /^FIRECRAWL_API_KEY(_\d+)?$/.test(k) && typeof v === "string" && v.length > 0)
-    .map(([, v]) => v as string);
-  return Array.from(new Set(keys));
-}
-
-async function firecrawlWithFallback<T>(fn: (client: Firecrawl) => Promise<T>): Promise<T> {
-  const keys = getFirecrawlKeys();
-  if (keys.length === 0) throw new Error("Firecrawl is not connected");
-  let lastError: unknown;
-  for (const apiKey of keys) {
-    try {
-      return await fn(new Firecrawl({ apiKey }));
-    } catch (error) {
-      lastError = error;
-      const message = error instanceof Error ? error.message : String(error);
-      if (!/unauthorized|invalid token|forbidden/i.test(message)) throw error;
-    }
-  }
-  throw lastError instanceof Error ? lastError : new Error(String(lastError));
-}
-
 // ---------- Teletalk API client ----------
 
 type TeletalkOrg = {
@@ -82,7 +68,7 @@ type TeletalkListJob = {
   id: number;
   job_title: string;
   job_title_bn?: string;
-  job_id: string; // e.g. GJOB13749
+  job_id: string;
   application_site?: string;
   vacancy?: string;
   published_date?: string;
@@ -120,12 +106,34 @@ export async function fetchTeletalkJobDetail(id: string | number): Promise<Telet
   return json.details ?? null;
 }
 
-function buildCircularUrl(detail: TeletalkDetail): string {
-  if (detail.advertisement_file) {
-    return `${MEDIA_BASE}/${detail.advertisement_file.replace(/^\/+/, "")}`;
+export function resolveTeletalkMediaUrl(value?: string | null): string | null {
+  const trimmed = value?.trim();
+  if (!trimmed) return null;
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+
+  const encodedPath = trimmed
+    .replace(/^\/+/, "")
+    .split("/")
+    .map((part) => {
+      try {
+        return encodeURIComponent(decodeURIComponent(part));
+      } catch {
+        return encodeURIComponent(part);
+      }
+    })
+    .join("/");
+
+  if (trimmed.startsWith("/media/")) {
+    return `${SITE_BASE}/${encodedPath}`;
   }
-  const orgId = detail.organization_id;
-  return `${SITE_BASE}/jobs/government/${orgId}?jobId=${detail.job_id}`;
+  return `${MEDIA_BASE}/${encodedPath}`;
+}
+
+function buildCircularUrl(detail: TeletalkDetail): string {
+  return (
+    resolveTeletalkMediaUrl(detail.advertisement_file) ??
+    `${SITE_BASE}/jobs/government/${detail.organization_id}?jobId=${detail.job_id}`
+  );
 }
 
 function toIsoDate(value?: string | null): string | null {
@@ -135,17 +143,181 @@ function toIsoDate(value?: string | null): string | null {
   return d.toISOString().slice(0, 10);
 }
 
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function stringOrNull(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function numberOrNull(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function stringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item): item is string => typeof item === "string" && item.trim())
+    .map((s) => s.trim());
+}
+
+function normalizeParsedPdf(value: unknown, ocrText: string): ParsedPdfRequirements {
+  const record = asRecord(value);
+  return {
+    required_degrees: stringArray(record.required_degrees),
+    required_subjects: stringArray(record.required_subjects),
+    min_experience_years: numberOrNull(record.min_experience_years),
+    preferred_skills: stringArray(record.preferred_skills),
+    salary_scale: stringOrNull(record.salary_scale),
+    quota_info: stringOrNull(record.quota_info),
+    min_age: numberOrNull(record.min_age),
+    max_age: numberOrNull(record.max_age),
+    vacancy: stringOrNull(record.vacancy),
+    application_fee: stringOrNull(record.application_fee),
+    confidence_score: numberOrNull(record.confidence_score),
+    parse_notes: stringOrNull(record.parse_notes),
+    ocr_text_excerpt: ocrText.slice(0, 1000) || null,
+  };
+}
+
+export function extractJsonObject(text: string): unknown {
+  const unfenced = text
+    .trim()
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/i, "");
+  const start = unfenced.indexOf("{");
+  const end = unfenced.lastIndexOf("}");
+  if (start === -1 || end === -1 || end <= start) return null;
+  return JSON.parse(unfenced.slice(start, end + 1));
+}
+
+async function postMistral(path: string, body: unknown, apiKey: string) {
+  const res = await fetch(`https://api.mistral.ai/v1/${path}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`Mistral ${path} ${res.status}: ${await res.text()}`);
+  return res.json();
+}
+
+export async function parsePdfWithMistral(pdfUrl: string): Promise<ParsedPdfRequirements | null> {
+  const apiKey = process.env.MISTRAL_API_KEY;
+  if (!apiKey) return null;
+
+  const ocrData = (await postMistral(
+    "ocr",
+    {
+      model: "mistral-ocr-latest",
+      document: { type: "url", url: pdfUrl },
+    },
+    apiKey,
+  )) as { pages?: Array<{ markdown?: string }> };
+
+  const fullText =
+    ocrData.pages
+      ?.map((p) => p.markdown)
+      .filter(Boolean)
+      .join("\n\n") ?? "";
+  if (fullText.length < 300) {
+    throw new Error("Mistral OCR returned too little text from the circular PDF");
+  }
+
+  const prompt = `Extract job requirements from this Bangladesh government job circular text. Return ONLY valid JSON:
+{
+  "required_degrees": ["list degree names in English, e.g. BSc, BBA, SSC, HSC"],
+  "required_subjects": ["specific subject/major if mentioned, or empty array"],
+  "min_experience_years": 0,
+  "preferred_skills": ["skills if mentioned, or empty array"],
+  "salary_scale": "grade and pay range as string e.g. Grade-13, 11000-26590 BDT",
+  "quota_info": "any district/freedom fighter/quota details as string, or null",
+  "min_age": 18,
+  "max_age": 32,
+  "vacancy": "vacancy count as string or null",
+  "application_fee": "application fee as string or null",
+  "confidence_score": 0.0,
+  "parse_notes": "short note if fields are unclear"
+}
+Rules:
+- Handle both Bangla and English.
+- If a field is not mentioned, use null or empty array.
+- Do not guess.
+- Do not include markdown.
+- Do not include explanation outside the JSON object.
+
+Circular text:
+${fullText.slice(0, 12000)}`;
+
+  const chatData = (await postMistral(
+    "chat/completions",
+    {
+      model: "mistral-small-latest",
+      response_format: { type: "json_object" },
+      messages: [{ role: "user", content: prompt }],
+    },
+    apiKey,
+  )) as { choices?: Array<{ message?: { content?: string } }> };
+
+  const content = chatData.choices?.[0]?.message?.content ?? "";
+  const parsed = extractJsonObject(content);
+  if (!parsed) return null;
+  return normalizeParsedPdf(parsed, fullText);
+}
+
+function requirementsStatus(parsed: ParsedPdfRequirements | null): RequirementsStatus {
+  if (!parsed) return "unknown";
+  const hasKeyRequirements =
+    parsed.required_degrees.length > 0 ||
+    parsed.required_subjects.length > 0 ||
+    parsed.min_experience_years != null ||
+    parsed.preferred_skills.length > 0 ||
+    parsed.min_age != null ||
+    parsed.max_age != null;
+  if (hasKeyRequirements) return "parsed";
+  const hasSupportingData =
+    parsed.salary_scale != null ||
+    parsed.quota_info != null ||
+    parsed.vacancy != null ||
+    parsed.application_fee != null;
+  return hasSupportingData ? "partial" : "unknown";
+}
+
+function shouldSkipOcr(existing: ExistingJob | undefined, pdfUrl: string | null): boolean {
+  if (!existing || !pdfUrl) return false;
+  const parsedJson = asRecord(existing.parsed_json);
+  return parsedJson.circular_pdf_url === pdfUrl && parsedJson.requirements_status === "parsed";
+}
+
+function delay(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function withResolvedAdvertisementFile(detail: TeletalkDetail, pdfUrl: string | null) {
+  return {
+    ...detail,
+    advertisement_file: pdfUrl ?? detail.advertisement_file ?? null,
+  };
+}
+
 /**
- * Crawl government jobs directly from the Teletalk public API.
- * If Firecrawl is available and a circular PDF link is present, optionally
- * scrape it for richer education/experience requirements via LLM.
+ * Crawl government jobs directly from the Teletalk public API and enrich the
+ * official Teletalk PDF with Mistral OCR when needed.
  */
 export async function crawlGovernmentJobs(limit: number, triggeredBy?: string) {
   const startedAt = new Date().toISOString();
-  const errorList: { url: string; error: string }[] = [];
-  const tryFirecrawl = getFirecrawlKeys().length > 0;
+  const errorList: CrawlError[] = [];
+  const maxOcr = Math.min(MAX_PDF_ENRICHMENTS_PER_RUN, Math.max(0, limit));
+  const hasMistralKey = !!process.env.MISTRAL_API_KEY;
+  let ocrAttempts = 0;
+  let enriched = 0;
+  let skippedEnrichment = 0;
 
-  // 1. Fetch listing pages until we have at least `limit` candidates.
   const pageSize = Math.min(20, Math.max(5, limit));
   let listed: TeletalkListJob[] = [];
   try {
@@ -164,98 +336,151 @@ export async function crawlGovernmentJobs(limit: number, triggeredBy?: string) {
     });
   }
 
-  // 2. Skip already-ingested external_job_ids.
-  const { data: existing } = await supabaseAdmin.from("jobs").select("external_job_id");
-  const existingSet = new Set(
-    (existing ?? []).map((row) => row.external_job_id).filter(Boolean) as string[],
+  const { data: existing } = await supabaseAdmin
+    .from("jobs")
+    .select(
+      "external_job_id, parsed_json, education_requirements, experience_requirements, salary, age_limit",
+    );
+  const existingByExternalId = new Map(
+    ((existing ?? []) as ExistingJob[])
+      .filter((row) => row.external_job_id)
+      .map((row) => [row.external_job_id as string, row]),
   );
 
-  const candidates = listed
-    .filter((j) => !existingSet.has(`teletalk:${j.id}`))
-    .slice(0, limit);
+  const candidates = listed.slice(0, limit);
+  const results: { url: string; ok: boolean; error?: string; enriched?: boolean }[] = [];
 
-  // 3. Fetch detail + (optional) PDF parse for each candidate.
-  const results: { url: string; ok: boolean; error?: string }[] = [];
   for (const job of candidates) {
     const fallbackUrl = `${SITE_BASE}/jobs/government/${job.organization_id}?jobId=${job.job_id}`;
+    let circularUrl = fallbackUrl;
     try {
       const detail = await fetchTeletalkJobDetail(job.id);
       if (!detail) {
         results.push({ url: fallbackUrl, ok: false, error: "Detail not found" });
         continue;
       }
-      const circularUrl = buildCircularUrl(detail);
 
-      // Optional Firecrawl PDF enrichment
-      let parsed: ParsedJobCircular | null = null;
-      if (tryFirecrawl && detail.advertisement_file) {
+      const pdfUrl = resolveTeletalkMediaUrl(detail.advertisement_file);
+      circularUrl = buildCircularUrl(detail);
+      const externalId = `teletalk:${detail.id}`;
+      const existingJob = existingByExternalId.get(externalId);
+      let parsed: ParsedPdfRequirements | null = null;
+      let enrichmentError: string | null = null;
+      let status: RequirementsStatus = "unknown";
+
+      if (shouldSkipOcr(existingJob, pdfUrl)) {
+        skippedEnrichment += 1;
+        status = "parsed";
+      } else if (pdfUrl && !hasMistralKey) {
+        skippedEnrichment += 1;
+        enrichmentError = "MISTRAL_API_KEY is not configured";
+        errorList.push({ url: pdfUrl, error: enrichmentError });
+      } else if (pdfUrl && ocrAttempts < maxOcr) {
         try {
-          const scraped = await firecrawlWithFallback((c) =>
-            c.scrape(circularUrl, { formats: ["markdown"], onlyMainContent: true }),
-          );
-          const markdown =
-            (scraped as { markdown?: string }).markdown ??
-            (scraped as { data?: { markdown?: string } }).data?.markdown ??
-            "";
-          if (markdown && markdown.length > 300) {
-            parsed = await parseCircularToJob(markdown, circularUrl);
+          await delay(1000);
+          ocrAttempts += 1;
+          parsed = await parsePdfWithMistral(pdfUrl);
+          status = requirementsStatus(parsed);
+          if (parsed && status !== "unknown") enriched += 1;
+          if (!parsed || status === "unknown") {
+            enrichmentError = "Mistral OCR did not extract usable requirements";
+            errorList.push({ url: pdfUrl, error: enrichmentError });
           }
-        } catch {
-          // Best-effort enrichment; fall through to API-only insert.
+        } catch (error) {
+          enrichmentError = error instanceof Error ? error.message : String(error);
+          errorList.push({ url: pdfUrl, error: enrichmentError });
         }
+      } else {
+        skippedEnrichment += pdfUrl ? 1 : 0;
+        enrichmentError = pdfUrl
+          ? "Skipped Mistral OCR because the per-run enrichment limit was reached"
+          : "No official circular PDF found in Teletalk details";
+        errorList.push({ url: pdfUrl ?? fallbackUrl, error: enrichmentError });
       }
 
       const orgName = detail.job_utilities_govtorganization?.name ?? null;
-      const externalId = `teletalk:${detail.id}`;
-
-      const ageLimit: Record<string, number | null> = {
-        min_age: typeof detail.min_age === "number" ? detail.min_age : (parsed?.min_age ?? null),
-        max_age: typeof detail.max_age === "number" ? detail.max_age : (parsed?.max_age ?? null),
+      const previousEducation = asRecord(existingJob?.education_requirements);
+      const previousExperience = asRecord(existingJob?.experience_requirements);
+      const previousAge = asRecord(existingJob?.age_limit);
+      const educationReq = shouldSkipOcr(existingJob, pdfUrl)
+        ? {
+            required_degrees: stringArray(previousEducation.required_degrees),
+            required_subjects: stringArray(previousEducation.required_subjects),
+          }
+        : {
+            required_degrees: parsed?.required_degrees ?? [],
+            required_subjects: parsed?.required_subjects ?? [],
+          };
+      const experienceReq = shouldSkipOcr(existingJob, pdfUrl)
+        ? {
+            min_experience_years: numberOrNull(previousExperience.min_experience_years),
+            preferred_skills: stringArray(previousExperience.preferred_skills),
+          }
+        : {
+            min_experience_years: parsed?.min_experience_years ?? null,
+            preferred_skills: parsed?.preferred_skills ?? [],
+          };
+      const ageLimit = {
+        min_age:
+          typeof detail.min_age === "number"
+            ? detail.min_age
+            : (parsed?.min_age ?? numberOrNull(previousAge.min_age)),
+        max_age:
+          typeof detail.max_age === "number"
+            ? detail.max_age
+            : (parsed?.max_age ?? numberOrNull(previousAge.max_age)),
       };
 
-      const educationReq = {
-        required_degrees: parsed?.required_degrees ?? [],
-        required_subjects: parsed?.required_subjects ?? [],
-      };
-      const experienceReq = {
-        min_experience_years: parsed?.min_experience_years ?? null,
-        preferred_skills: parsed?.preferred_skills ?? [],
+      const parsedJson = {
+        api: {
+          list: job,
+          detail: withResolvedAdvertisementFile(detail, pdfUrl),
+          advertisement_file: pdfUrl ?? detail.advertisement_file ?? null,
+        },
+        llm: parsed ?? asRecord(existingJob?.parsed_json).llm ?? null,
+        circular_pdf_url: pdfUrl,
+        ocr_text_excerpt:
+          parsed?.ocr_text_excerpt ?? asRecord(existingJob?.parsed_json).ocr_text_excerpt ?? null,
+        requirements_status: status,
+        enrichment_method:
+          status === "unknown" ? (enrichmentError ? "failed" : "none") : "mistral_ocr",
+        enrichment_error: enrichmentError,
+        strategy_used: "teletalk_api_mistral_ocr",
       };
 
       const { error } = await supabaseAdmin.from("jobs").upsert(
         {
           external_job_id: externalId,
-          title: parsed?.title || detail.job_title,
-          organization: parsed?.organization ?? orgName,
+          title: detail.job_title,
+          organization: orgName,
           description:
-            parsed?.summary ??
-            ([
+            [
               detail.advertisement_no && `Advertisement: ${detail.advertisement_no}`,
-              detail.vacancy && `Vacancy: ${detail.vacancy}`,
+              (parsed?.vacancy || detail.vacancy) &&
+                `Vacancy: ${parsed?.vacancy || detail.vacancy}`,
+              parsed?.quota_info && `Quota: ${parsed.quota_info}`,
+              parsed?.application_fee && `Application fee: ${parsed.application_fee}`,
+              parsed?.parse_notes && `Parse notes: ${parsed.parse_notes}`,
             ]
               .filter(Boolean)
-              .join("\n") ||
-              null),
-          deadline: parsed?.deadline || toIsoDate(detail.deadline_date),
-          salary: parsed?.salary ?? null,
+              .join("\n") || null,
+          deadline: toIsoDate(detail.deadline_date),
+          salary: parsed?.salary_scale ?? existingJob?.salary ?? null,
           age_limit: ageLimit,
           education_requirements: educationReq,
           experience_requirements: experienceReq,
           circular_url: circularUrl,
           source_url: detail.application_site || detail.job_source || circularUrl,
-          parsed_json: {
-            api: detail,
-            llm: parsed ?? null,
-          },
+          parsed_json: parsedJson,
         },
         { onConflict: "external_job_id" },
       );
 
       if (error) results.push({ url: circularUrl, ok: false, error: error.message });
-      else results.push({ url: circularUrl, ok: true });
+      else results.push({ url: circularUrl, ok: true, enriched: status !== "unknown" });
     } catch (error) {
       results.push({
-        url: fallbackUrl,
+        url: circularUrl,
         ok: false,
         error: error instanceof Error ? error.message : String(error),
       });
@@ -269,7 +494,7 @@ export async function crawlGovernmentJobs(limit: number, triggeredBy?: string) {
     ...results.filter((r) => !r.ok).map((r) => ({ url: r.url, error: r.error ?? "Unknown" })),
   ];
 
-  const { data: runRow } = await supabaseAdmin
+  const { data: runRow, error: runError } = await supabaseAdmin
     .from("crawl_runs")
     .insert({
       started_at: startedAt,
@@ -278,11 +503,23 @@ export async function crawlGovernmentJobs(limit: number, triggeredBy?: string) {
       attempted: candidates.length,
       succeeded,
       failed,
-      errors,
+      errors: [
+        ...errors,
+        {
+          url: "strategy",
+          error: JSON.stringify({
+            enriched,
+            ocr_attempts: ocrAttempts,
+            skipped_enrichment: skippedEnrichment,
+            strategy_used: "teletalk_api_mistral_ocr",
+          }),
+        },
+      ],
       triggered_by: triggeredBy ?? null,
     })
     .select("id")
     .maybeSingle();
+  if (runError) throw new Error(runError.message);
 
   return {
     runId: runRow?.id ?? null,
@@ -290,6 +527,10 @@ export async function crawlGovernmentJobs(limit: number, triggeredBy?: string) {
     attempted: candidates.length,
     succeeded,
     failed,
+    enriched,
+    ocr_attempts: ocrAttempts,
+    skipped_enrichment: skippedEnrichment,
+    strategy_used: "teletalk_api_mistral_ocr",
     results,
   };
 }

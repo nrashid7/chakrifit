@@ -1,113 +1,90 @@
-# Teletalk Government Jobs — Scraping Notes
+# Teletalk Government Jobs Scraping Notes
 
-ChakriFit ingests Bangladesh government job circulars directly from the
-public Teletalk Alljobs JSON API. The public listing page
-`https://alljobs.teletalk.com.bd/jobs/government` is a React SPA, so HTML
-scraping returns mostly an empty shell. The API path is the source of truth.
+ChakriFit ingests Bangladesh government job circulars from the public Teletalk
+Alljobs JSON API. Teletalk is the canonical source; the crawler does not use
+third-party job websites.
 
-## Endpoints (no auth required)
+## Official Endpoints
 
-| Purpose         | Method | Path                                                 |
-| --------------- | ------ | ---------------------------------------------------- |
-| Job listing     | GET    | `/api/v1/govt-jobs/list?page={n}&limit={k}`          |
-| Job detail      | GET    | `/api/v1/govt-jobs/public-details?id={numericId}`    |
-| Organizations   | GET    | `/api/v1/govt-organizations/list?skipLimit=YES`      |
+| Purpose       | Method | Path                                              |
+| ------------- | ------ | ------------------------------------------------- |
+| Job listing   | GET    | `/api/v1/govt-jobs/list?page={n}&limit={k}`       |
+| Job detail    | GET    | `/api/v1/govt-jobs/public-details?id={numericId}` |
+| Organizations | GET    | `/api/v1/govt-organizations/list?skipLimit=YES`   |
 
 Base URL: `https://alljobs.teletalk.com.bd`
 
-> NOTE: The non-suffixed variants (`/api/v1/govt-jobs`,
-> `/api/v1/govt-jobs/details`, `/api/v1/govt-jobs/job-total-list`) require
-> a Bearer token. The `/list` and `/public-details` variants are the public
-> read-only paths used by the SPA before login.
+The public listing page is a React SPA, so HTML scraping is not reliable. The
+JSON list/detail endpoints are the source of truth for job metadata.
 
-## Example requests
+## Official PDF Resolution
 
-```bash
-curl -s "https://alljobs.teletalk.com.bd/api/v1/govt-jobs/list?page=1&limit=20"
-curl -s "https://alljobs.teletalk.com.bd/api/v1/govt-jobs/public-details?id=13749"
-```
+`public-details` may include `advertisement_file`, usually as a relative path
+under Teletalk media. The crawler resolves it as follows:
 
-## Response shape (truncated)
+- Absolute `http`/`https` URLs are used as-is.
+- Paths beginning with `/media/` are prefixed with
+  `https://alljobs.teletalk.com.bd`.
+- Other relative values are prefixed with
+  `https://alljobs.teletalk.com.bd/media/`.
 
-### `/govt-jobs/list`
+The resolved official PDF URL is saved to `jobs.circular_url`,
+`jobs.source_url` when no better application URL exists, and
+`parsed_json.circular_pdf_url`.
 
-```json
-{
-  "status": "success",
-  "count": 117,
-  "govtJobs": [
-    {
-      "id": 13749,
-      "job_title": "Assistant Maintenance Engineer",
-      "job_id": "GJOB13749",
-      "vacancy": "01",
-      "published_date": "2026-05-24T04:00:00.000Z",
-      "deadline_date": "2026-06-20T11:00:00.000Z",
-      "organization_id": 1144,
-      "job_utilities_govtorganization": {
-        "id": 1144,
-        "name": "National Pension Authority(NPA)",
-        "short_name": "NPA"
-      }
-    }
-  ]
-}
-```
+## Mistral OCR Enrichment
 
-### `/govt-jobs/public-details?id={id}`
+The Teletalk API provides listing metadata, while education, experience, quota,
+fee, and salary details often live inside the official advertisement PDF. When
+`MISTRAL_API_KEY` is configured, ChakriFit:
 
-```json
-{
-  "status": "success",
-  "details": {
-    "id": 13749,
-    "job_title": "Assistant Maintenance Engineer",
-    "min_age": 18,
-    "max_age": 32,
-    "vacancy": "01",
-    "advertisement_file": "public/uploads/governments/jobs/advertisement-1779521154759.pdf",
-    "advertisement_no": "07.04.0000.000.001.11.0001.25.215",
-    "deadline_date": "2026-06-20T11:00:00.000Z",
-    "application_site": "https://npa.teletalk.com.bd/",
-    "job_utilities_govtorganization": { "id": 1144, "name": "..." }
-  }
-}
-```
+1. Sends the official PDF URL to Mistral OCR (`mistral-ocr-latest`).
+2. Combines the returned page markdown.
+3. Sends the markdown to Mistral Small (`mistral-small-latest`) with JSON
+   response mode.
+4. Saves normalized requirements into the existing `jobs` table.
 
-## Mapping to the `jobs` table
+Firecrawl is no longer required.
 
-| `jobs` column              | Source                                                        |
-| -------------------------- | ------------------------------------------------------------- |
-| `external_job_id`          | `teletalk:{detail.id}` (stable, unique)                       |
-| `title`                    | LLM `title` if available, else `detail.job_title`             |
-| `organization`             | LLM `organization` if available, else org `name`              |
-| `description`              | LLM `summary` || `"Advertisement: X\nVacancy: Y"`             |
-| `deadline`                 | LLM `deadline` || `detail.deadline_date` (ISO date)           |
-| `salary`                   | LLM `salary`                                                  |
-| `age_limit`                | `{ min_age: detail.min_age, max_age: detail.max_age }`        |
-| `education_requirements`   | LLM `required_degrees` / `required_subjects` (empty if no PDF)|
-| `experience_requirements`  | LLM `min_experience_years` / `preferred_skills`               |
-| `circular_url`             | `https://alljobs.teletalk.com.bd/media/{advertisement_file}`  |
-| `source_url`               | `application_site` || `job_source` || `circular_url`          |
-| `parsed_json`              | `{ api: detail, llm: parsedOrNull }`                          |
+## Mapping To `jobs`
 
-## Fallback strategy
+| `jobs` column             | Source                                                            |
+| ------------------------- | ----------------------------------------------------------------- |
+| `external_job_id`         | `teletalk:{detail.id}`                                            |
+| `title`                   | Teletalk detail `job_title`                                       |
+| `organization`            | Teletalk organization name                                        |
+| `description`             | Advertisement number, vacancy, quota, fee, and parse notes        |
+| `deadline`                | Teletalk detail `deadline_date`                                   |
+| `salary`                  | Mistral `salary_scale` when available                             |
+| `age_limit`               | Teletalk age first, Mistral age as fallback                       |
+| `education_requirements`  | Mistral `required_degrees` and `required_subjects`                |
+| `experience_requirements` | Mistral `min_experience_years` and `preferred_skills`             |
+| `circular_url`            | Resolved official Teletalk PDF URL                                |
+| `source_url`              | Teletalk application site, job source, or PDF URL                 |
+| `parsed_json`             | Teletalk API payload, Mistral result, status, method, and PDF URL |
 
-1. **API first.** Listing + public details cover identifying fields,
-   deadline, age limits, vacancy, and the circular PDF link.
-2. **PDF enrichment (optional).** When `advertisement_file` is present
-   and a `FIRECRAWL_API_KEY` secret is configured, ChakriFit scrapes
-   the PDF via Firecrawl and runs an LLM parse (Lovable AI gateway,
-   `google/gemini-3-flash-preview`) to fill education / experience /
-   skills requirements. Multiple Firecrawl keys are tried in order; if
-   all fail or none are present, the API-only record is saved.
-3. **No Firecrawl.** The job is still inserted with API fields. The
-   matcher treats missing requirements as "unspecified" — users will
-   match more loosely until the circular is re-enriched.
+## Requirement Status
 
-## Crawl run logging
+`parsed_json.requirements_status` is:
 
-Every run inserts a row into `crawl_runs`:
-`started_at, finished_at, discovered, attempted, succeeded, failed,
-errors (jsonb), triggered_by`. The admin dashboard reads the latest
-row for the crawler status panel.
+- `parsed` when Mistral extracts meaningful education, age, or experience data.
+- `partial` when Mistral extracts useful supporting data but key requirement
+  fields are missing.
+- `unknown` when no PDF exists, OCR fails, or extraction returns no useful data.
+
+The UI labels unknown fields as `Not parsed yet - verify official circular`.
+
+## Cost Controls
+
+- A manual or scheduled crawl enriches at most 20 PDFs.
+- Existing rows are not re-parsed when the same `circular_pdf_url` already has
+  `requirements_status = parsed`.
+- OCR calls run sequentially with a one second delay between PDFs.
+- A failed OCR parse does not block saving the API-only job row.
+
+## Required Secrets
+
+- `MISTRAL_API_KEY`: server-only secret for OCR and Mistral Small extraction.
+- `ADMIN_EMAIL`: controls who can trigger the in-app crawler.
+- `CRON_SECRET`: protects the scheduled Supabase Edge Function.
+- `SUPABASE_SERVICE_ROLE_KEY`: server-only key for crawler upserts.
