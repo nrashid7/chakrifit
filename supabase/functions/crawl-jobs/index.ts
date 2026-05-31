@@ -147,6 +147,20 @@ async function runCrawl(limit: number) {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
+  if (!CRON_SECRET) {
+    return new Response(
+      JSON.stringify({ ok: false, error: "CRON_SECRET not configured on server" }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
+  if (req.headers.get("x-cron-secret") !== CRON_SECRET) {
+    return new Response(
+      JSON.stringify({ ok: false, error: "Unauthorized" }),
+      { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
+
+
   try {
     let limit = MAX_PER_RUN;
     if (req.method === "POST") {
