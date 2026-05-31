@@ -125,14 +125,34 @@ function Dashboard() {
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
             {isAdmin && (
-              <Button variant="outline" onClick={() => crawl.mutate()} disabled={crawl.isPending}>
-                {crawl.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <RefreshCw className="h-4 w-4" />
+              <>
+                <Button
+                  variant="outline"
+                  onClick={() => crawl.mutate()}
+                  disabled={crawl.isPending}
+                >
+                  {crawl.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4" />
+                  )}
+                  Fetch circulars
+                </Button>
+                {crawl.isPending && (
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      crawl.reset();
+                      toast.info(
+                        "Stopped waiting. The fetch may still finish in the background.",
+                      );
+                      qc.invalidateQueries({ queryKey: ["latest-crawl-run"] });
+                    }}
+                  >
+                    Cancel
+                  </Button>
                 )}
-                Fetch circulars
-              </Button>
+              </>
             )}
             <Button onClick={() => compute.mutate()} disabled={compute.isPending}>
               {compute.isPending ? (

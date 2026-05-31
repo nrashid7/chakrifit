@@ -174,7 +174,7 @@ function numberOrNull(value: unknown): number | null {
 function stringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value
-    .filter((item): item is string => typeof item === "string" && item.trim())
+    .filter((item): item is string => typeof item === "string" && item.trim().length > 0)
     .map((s) => s.trim());
 }
 
@@ -509,7 +509,7 @@ export async function crawlGovernmentJobs(limit: number, triggeredBy?: string) {
           experience_requirements: experienceReq,
           circular_url: circularUrl,
           source_url: detail.application_site || detail.job_source || circularUrl,
-          parsed_json: parsedJson,
+          parsed_json: JSON.parse(JSON.stringify(parsedJson)),
         },
         { onConflict: "external_job_id" },
       );
