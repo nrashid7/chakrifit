@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { getMyProfile } from "@/lib/resume.functions";
 import { listMatches, computeMatches, explainMatch } from "@/lib/matches.functions";
 import { toggleSave } from "@/lib/saved.functions";
-import { crawlJobs } from "@/lib/jobs.functions";
+import { crawlJobs, amIAdmin } from "@/lib/jobs.functions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -41,9 +41,12 @@ function Dashboard() {
   const crawlFn = useServerFn(crawlJobs);
   const toggleFn = useServerFn(toggleSave);
   const explainFn = useServerFn(explainMatch);
+  const adminFn = useServerFn(amIAdmin);
 
   const profile = useQuery({ queryKey: ["profile"], queryFn: () => profileFn() });
   const matches = useQuery({ queryKey: ["matches"], queryFn: () => matchesFn() });
+  const admin = useQuery({ queryKey: ["am-i-admin"], queryFn: () => adminFn() });
+  const isAdmin = admin.data?.isAdmin ?? false;
 
   // First-time onboarding redirect
   useEffect(() => {
@@ -83,10 +86,12 @@ function Dashboard() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => crawl.mutate()} disabled={crawl.isPending}>
-            {crawl.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-            <span className="ml-1">Fetch new circulars</span>
-          </Button>
+          {isAdmin && (
+            <Button variant="outline" size="sm" onClick={() => crawl.mutate()} disabled={crawl.isPending}>
+              {crawl.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              <span className="ml-1">Fetch new circulars</span>
+            </Button>
+          )}
           <Button size="sm" onClick={() => compute.mutate()} disabled={compute.isPending}>
             {compute.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
             <span className="ml-1">Recompute matches</span>
@@ -96,18 +101,28 @@ function Dashboard() {
 
       {all.length === 0 ? (
         <div className="rounded-2xl border bg-card p-8 text-center space-y-4">
-          <p className="text-muted-foreground">No matches yet. Fetch new circulars or update your profile.</p>
+          <p className="text-muted-foreground">
+            {isAdmin
+              ? "No matches yet. Fetch new circulars or update your profile."
+              : "No matches yet. Update your profile or check back soon as new circulars are added."}
+          </p>
           <div className="flex justify-center gap-2">
-            <Button
-              size="sm"
-              onClick={async () => {
-                await crawl.mutateAsync();
-                compute.mutate();
-              }}
-              disabled={crawl.isPending || compute.isPending}
-            >
-              {(crawl.isPending || compute.isPending) ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-              <span className="ml-1">Fetch jobs &amp; recompute</span>
+            {isAdmin && (
+              <Button
+                size="sm"
+                onClick={async () => {
+                  await crawl.mutateAsync();
+                  compute.mutate();
+                }}
+                disabled={crawl.isPending || compute.isPending}
+              >
+                {(crawl.isPending || compute.isPending) ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                <span className="ml-1">Fetch jobs &amp; recompute</span>
+              </Button>
+            )}
+            <Button size="sm" variant="outline" onClick={() => compute.mutate()} disabled={compute.isPending}>
+              {compute.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+              <span className="ml-1">Recompute matches</span>
             </Button>
             <Link to="/onboarding">
               <Button variant="outline" size="sm">Update profile</Button>

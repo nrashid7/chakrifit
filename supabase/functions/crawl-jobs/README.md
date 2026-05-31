@@ -65,3 +65,9 @@ To unschedule:
 ```sql
 select cron.unschedule('chakrifit-crawl-daily');
 ```
+
+## Deployment checklist
+
+- Set `ADMIN_EMAIL` in Lovable Cloud → Secrets (gates the in-app manual "Fetch new circulars" button).
+- Set `CRON_SECRET` in Lovable Cloud → Secrets (gates this scheduled Edge Function).
+- Run the pg_cron SQL above inside the Supabase SQL editor to enable the daily crawl. Until then, only the admin can trigger crawls manually from the dashboard.
