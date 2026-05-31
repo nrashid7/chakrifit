@@ -1,22 +1,42 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { getMyProfile, parseResumeText, saveProfile, type ParsedResumeData } from "@/lib/resume.functions";
+import {
+  getMyProfile,
+  parseResumeText,
+  saveProfile,
+  type ParsedResumeData,
+} from "@/lib/resume.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Upload, Loader2, Sparkles, Check, Plus, X } from "lucide-react";
+import {
+  BriefcaseBusiness,
+  Check,
+  FileText,
+  GraduationCap,
+  Loader2,
+  Plus,
+  Sparkles,
+  Upload,
+  X,
+} from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/onboarding")({
-  head: () => ({ meta: [{ title: "Get started · ChakriFit" }] }),
+  head: () => ({ meta: [{ title: "Get started | ChakriFit" }] }),
   component: Onboarding,
 });
 
-type Edu = { degree?: string | null; subject?: string | null; institution?: string | null; graduation_year?: number | null };
+type Edu = {
+  degree?: string | null;
+  subject?: string | null;
+  institution?: string | null;
+  graduation_year?: number | null;
+};
 type Exp = { title?: string | null; company?: string | null; years?: number | null };
 
 function Onboarding() {
@@ -48,10 +68,14 @@ function Onboarding() {
       if (text.length < 50) throw new Error("Couldn't read resume text. Try another file.");
       setExtractedText(text);
 
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) throw new Error("Not signed in");
       const path = `${user.id}/${Date.now()}-${file.name}`;
-      const { error: upErr } = await supabase.storage.from("resumes").upload(path, file, { upsert: true });
+      const { error: upErr } = await supabase.storage
+        .from("resumes")
+        .upload(path, file, { upsert: true });
       if (upErr) throw new Error(upErr.message);
       setResumePath(path);
 
@@ -80,7 +104,10 @@ function Onboarding() {
           full_name: fullName || null,
           age: age === "" ? null : Number(age),
           location: location || null,
-          skills: skills.split(",").map((s) => s.trim()).filter(Boolean),
+          skills: skills
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean),
           resume_path: resumePath,
           extracted_resume_text: extractedText,
           education: education
@@ -114,130 +141,290 @@ function Onboarding() {
   });
 
   function handleFindJobs() {
-    const validEdu = education.filter((e) => (e.degree && e.degree.trim()) || (e.subject && e.subject.trim()));
+    const validEdu = education.filter(
+      (e) => (e.degree && e.degree.trim()) || (e.subject && e.subject.trim()),
+    );
     if (validEdu.length === 0) {
-      toast.error("Add at least one education entry with a degree or subject. Institution or year alone is not enough.");
+      toast.error(
+        "Add at least one education entry with a degree or subject. Institution or year alone is not enough.",
+      );
       return;
     }
     finish.mutate();
   }
 
-  // If user has a parsed profile already, jump them to dashboard
   if (existing.data?.profile && existing.data.education.length > 0 && step === 1 && !processing) {
     navigate({ to: "/dashboard", replace: true });
     return null;
   }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold">Welcome to ChakriFit</h1>
-        <p className="text-muted-foreground mt-1">Four quick steps and you'll see jobs you qualify for.</p>
+    <div className="mx-auto max-w-5xl space-y-8">
+      <div className="rounded-2xl border bg-card p-6 shadow-sm">
+        <p className="text-sm font-semibold uppercase text-primary">Profile setup</p>
+        <h1 className="mt-2 text-3xl font-bold">Turn your resume into a job-match profile</h1>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+          Upload your CV, review what ChakriFit extracts, then score available circulars against
+          your profile.
+        </p>
       </div>
 
       <Stepper step={step} />
 
       {step === 1 && (
-        <label className="block rounded-2xl border-2 border-dashed border-border p-12 text-center cursor-pointer hover:bg-accent/30 transition">
+        <label className="block cursor-pointer rounded-2xl border-2 border-dashed border-primary/30 bg-card p-10 text-center shadow-sm transition hover:bg-accent/40">
           <input
             type="file"
             accept=".pdf,.docx,.txt"
             className="hidden"
-            onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) handleFile(f);
+            }}
           />
-          <Upload className="h-8 w-8 text-primary mx-auto" />
-          <div className="mt-3 font-semibold">Click to upload your resume</div>
-          <div className="text-sm text-muted-foreground mt-1">PDF or DOCX, English or Bangla. We never share your file.</div>
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
+            <Upload className="h-7 w-7" />
+          </div>
+          <div className="mt-4 text-lg font-semibold">Upload your resume</div>
+          <div className="mt-2 text-sm text-muted-foreground">
+            PDF, DOCX, or TXT. English, Bangla, and mixed-language resumes are supported.
+          </div>
         </label>
       )}
 
       {step === 2 && (
-        <div className="rounded-2xl border bg-card p-10 text-center">
-          <Loader2 className="h-6 w-6 animate-spin text-primary mx-auto" />
-          <p className="mt-3 font-medium">Reading and parsing your resume…</p>
-          <p className="text-xs text-muted-foreground mt-1">This usually takes 5–15 seconds.</p>
-        </div>
+        <Processing
+          title="Reading and parsing your resume..."
+          body="This usually takes 5 to 15 seconds."
+        />
       )}
-
       {step === 4 && (
-        <div className="rounded-2xl border bg-card p-10 text-center">
-          <Loader2 className="h-6 w-6 animate-spin text-primary mx-auto" />
-          <p className="mt-3 font-medium">Matching your profile to government jobs…</p>
-          <p className="text-xs text-muted-foreground mt-1">Scoring every circular and generating explanations.</p>
-        </div>
+        <Processing
+          title="Matching your profile to government jobs..."
+          body="Scoring every circular and generating explanations."
+        />
       )}
 
       {step === 3 && (
-        <div className="space-y-5">
+        <div className="space-y-5 rounded-2xl border bg-card p-5 shadow-sm sm:p-6">
           <div>
-            <h2 className="font-semibold">Step 3 · Review what we found</h2>
-            <p className="text-sm text-muted-foreground">Fix anything that's wrong, then continue.</p>
+            <h2 className="text-xl font-semibold">Review what we found</h2>
+            <p className="text-sm text-muted-foreground">
+              Fix anything that looks wrong before scoring jobs.
+            </p>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div><Label>Full name</Label><Input value={fullName} onChange={(e) => setFullName(e.target.value)} /></div>
-            <div><Label>Location</Label><Input value={location} onChange={(e) => setLocation(e.target.value)} /></div>
-            <div><Label>Age</Label><Input type="number" value={age} onChange={(e) => setAge(e.target.value ? Number(e.target.value) : "")} /></div>
-          </div>
+          <Panel title="Basic profile" icon={<FileText className="h-4 w-4 text-primary" />}>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <Label>Full name</Label>
+                <Input value={fullName} onChange={(e) => setFullName(e.target.value)} />
+              </div>
+              <div>
+                <Label>Location</Label>
+                <Input value={location} onChange={(e) => setLocation(e.target.value)} />
+              </div>
+              <div>
+                <Label>Age</Label>
+                <Input
+                  type="number"
+                  value={age}
+                  onChange={(e) => setAge(e.target.value ? Number(e.target.value) : "")}
+                />
+              </div>
+            </div>
+          </Panel>
 
-          <div>
+          <Panel title="Skills" icon={<Sparkles className="h-4 w-4 text-primary" />}>
             <Label>Skills (comma-separated)</Label>
             <Textarea value={skills} onChange={(e) => setSkills(e.target.value)} rows={2} />
-          </div>
+          </Panel>
 
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label>Education <span className="text-destructive">*</span></Label>
-              <Button type="button" variant="outline" size="sm" onClick={() => setEducation([...education, {}])} className="gap-1">
+          <Panel title="Education" icon={<GraduationCap className="h-4 w-4 text-primary" />}>
+            <div className="mb-3 flex items-center justify-between">
+              <Label>Required for scoring</Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setEducation([...education, {}])}
+              >
                 <Plus className="h-3 w-3" /> Add
               </Button>
             </div>
             {education.length === 0 && (
-              <p className="text-xs text-destructive">Add at least one education entry to continue.</p>
+              <p className="text-xs text-destructive">
+                Add at least one education entry to continue.
+              </p>
             )}
-            {education.map((e, i) => (
-              <div key={i} className="grid gap-2 sm:grid-cols-[1fr_1fr_1fr_80px_auto]">
-                <Input placeholder="Degree" value={e.degree ?? ""} onChange={(v) => setEducation(education.map((x, j) => j === i ? { ...x, degree: v.target.value } : x))} />
-                <Input placeholder="Subject" value={e.subject ?? ""} onChange={(v) => setEducation(education.map((x, j) => j === i ? { ...x, subject: v.target.value } : x))} />
-                <Input placeholder="Institution" value={e.institution ?? ""} onChange={(v) => setEducation(education.map((x, j) => j === i ? { ...x, institution: v.target.value } : x))} />
-                <Input type="number" placeholder="Year" value={e.graduation_year ?? ""} onChange={(v) => setEducation(education.map((x, j) => j === i ? { ...x, graduation_year: v.target.value ? Number(v.target.value) : null } : x))} />
-                <Button type="button" variant="ghost" size="icon" onClick={() => setEducation(education.filter((_, j) => j !== i))}>
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-            ))}
-          </div>
+            <div className="space-y-2">
+              {education.map((e, i) => (
+                <div key={i} className="grid gap-2 sm:grid-cols-[1fr_1fr_1fr_90px_auto]">
+                  <Input
+                    placeholder="Degree"
+                    value={e.degree ?? ""}
+                    onChange={(v) =>
+                      setEducation(
+                        education.map((x, j) => (j === i ? { ...x, degree: v.target.value } : x)),
+                      )
+                    }
+                  />
+                  <Input
+                    placeholder="Subject"
+                    value={e.subject ?? ""}
+                    onChange={(v) =>
+                      setEducation(
+                        education.map((x, j) => (j === i ? { ...x, subject: v.target.value } : x)),
+                      )
+                    }
+                  />
+                  <Input
+                    placeholder="Institution"
+                    value={e.institution ?? ""}
+                    onChange={(v) =>
+                      setEducation(
+                        education.map((x, j) =>
+                          j === i ? { ...x, institution: v.target.value } : x,
+                        ),
+                      )
+                    }
+                  />
+                  <Input
+                    type="number"
+                    placeholder="Year"
+                    value={e.graduation_year ?? ""}
+                    onChange={(v) =>
+                      setEducation(
+                        education.map((x, j) =>
+                          j === i
+                            ? {
+                                ...x,
+                                graduation_year: v.target.value ? Number(v.target.value) : null,
+                              }
+                            : x,
+                        ),
+                      )
+                    }
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setEducation(education.filter((_, j) => j !== i))}
+                    aria-label="Remove education row"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </Panel>
 
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label>Experience</Label>
-              <Button type="button" variant="outline" size="sm" onClick={() => setExperience([...experience, {}])} className="gap-1">
+          <Panel title="Experience" icon={<BriefcaseBusiness className="h-4 w-4 text-primary" />}>
+            <div className="mb-3 flex items-center justify-between">
+              <Label>Optional, but improves matching</Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setExperience([...experience, {}])}
+              >
                 <Plus className="h-3 w-3" /> Add
               </Button>
             </div>
-            {experience.length === 0 && <p className="text-xs text-muted-foreground">None detected — optional.</p>}
-            {experience.map((e, i) => (
-              <div key={i} className="grid gap-2 sm:grid-cols-[1fr_1fr_80px_auto]">
-                <Input placeholder="Title" value={e.title ?? ""} onChange={(v) => setExperience(experience.map((x, j) => j === i ? { ...x, title: v.target.value } : x))} />
-                <Input placeholder="Company" value={e.company ?? ""} onChange={(v) => setExperience(experience.map((x, j) => j === i ? { ...x, company: v.target.value } : x))} />
-                <Input type="number" step="0.5" placeholder="Years" value={e.years ?? ""} onChange={(v) => setExperience(experience.map((x, j) => j === i ? { ...x, years: v.target.value ? Number(v.target.value) : null } : x))} />
-                <Button type="button" variant="ghost" size="icon" onClick={() => setExperience(experience.filter((_, j) => j !== i))}>
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-            ))}
-          </div>
+            {experience.length === 0 && (
+              <p className="text-xs text-muted-foreground">
+                None detected. You can continue without experience.
+              </p>
+            )}
+            <div className="space-y-2">
+              {experience.map((e, i) => (
+                <div key={i} className="grid gap-2 sm:grid-cols-[1fr_1fr_90px_auto]">
+                  <Input
+                    placeholder="Title"
+                    value={e.title ?? ""}
+                    onChange={(v) =>
+                      setExperience(
+                        experience.map((x, j) => (j === i ? { ...x, title: v.target.value } : x)),
+                      )
+                    }
+                  />
+                  <Input
+                    placeholder="Company"
+                    value={e.company ?? ""}
+                    onChange={(v) =>
+                      setExperience(
+                        experience.map((x, j) => (j === i ? { ...x, company: v.target.value } : x)),
+                      )
+                    }
+                  />
+                  <Input
+                    type="number"
+                    step="0.5"
+                    placeholder="Years"
+                    value={e.years ?? ""}
+                    onChange={(v) =>
+                      setExperience(
+                        experience.map((x, j) =>
+                          j === i
+                            ? { ...x, years: v.target.value ? Number(v.target.value) : null }
+                            : x,
+                        ),
+                      )
+                    }
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setExperience(experience.filter((_, j) => j !== i))}
+                    aria-label="Remove experience row"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </Panel>
 
-          <div className="pt-4 border-t flex justify-between items-center">
-            <p className="text-xs text-muted-foreground">Step 4 happens automatically — we'll score every job for you.</p>
-            <Button size="lg" onClick={handleFindJobs} disabled={finish.isPending} className="gap-2">
-              {finish.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+          <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-xs text-muted-foreground">
+              Step 4 happens automatically. We will score every job for you.
+            </p>
+            <Button size="lg" onClick={handleFindJobs} disabled={finish.isPending}>
+              {finish.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Sparkles className="h-4 w-4" />
+              )}
               Find my jobs
             </Button>
           </div>
         </div>
       )}
     </div>
+  );
+}
+
+function Processing({ title, body }: { title: string; body: string }) {
+  return (
+    <div className="rounded-2xl border bg-card p-10 text-center shadow-sm">
+      <Loader2 className="mx-auto h-6 w-6 animate-spin text-primary" />
+      <p className="mt-3 font-medium">{title}</p>
+      <p className="mt-1 text-xs text-muted-foreground">{body}</p>
+    </div>
+  );
+}
+
+function Panel({ title, icon, children }: { title: string; icon: ReactNode; children: ReactNode }) {
+  return (
+    <section className="rounded-xl border bg-background p-4">
+      <div className="mb-4 flex items-center gap-2 font-medium">
+        {icon}
+        {title}
+      </div>
+      {children}
+    </section>
   );
 }
 
@@ -249,17 +436,19 @@ function Stepper({ step }: { step: number }) {
     { n: 4, label: "Match" },
   ];
   return (
-    <ol className="flex items-center gap-2 text-xs">
+    <ol className="flex flex-wrap items-center gap-2 rounded-2xl border bg-card p-3 text-xs shadow-sm">
       {items.map((it, i) => {
         const done = step > it.n;
         const active = step === it.n;
         return (
           <li key={it.n} className="flex items-center gap-2">
-            <span className={`inline-flex h-6 w-6 items-center justify-center rounded-full border ${active ? "bg-primary text-primary-foreground border-primary" : done ? "bg-success text-success-foreground border-success" : "bg-muted text-muted-foreground"}`}>
+            <span
+              className={`inline-flex h-7 w-7 items-center justify-center rounded-full border ${active ? "border-primary bg-primary text-primary-foreground" : done ? "border-success bg-success text-success-foreground" : "bg-muted text-muted-foreground"}`}
+            >
               {done ? <Check className="h-3 w-3" /> : it.n}
             </span>
             <span className={active ? "font-medium" : "text-muted-foreground"}>{it.label}</span>
-            {i < items.length - 1 && <span className="text-muted-foreground">→</span>}
+            {i < items.length - 1 && <span className="text-muted-foreground">/</span>}
           </li>
         );
       })}

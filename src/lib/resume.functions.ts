@@ -87,7 +87,11 @@ export const getMyProfile = createServerFn({ method: "GET" })
     if (!profile) return { profile: null, education: [], experience: [] };
 
     const [{ data: education }, { data: experience }] = await Promise.all([
-      supabase.from("education").select("*").eq("profile_id", profile.id).order("graduation_year", { ascending: false }),
+      supabase
+        .from("education")
+        .select("*")
+        .eq("profile_id", profile.id)
+        .order("graduation_year", { ascending: false }),
       supabase.from("experience").select("*").eq("profile_id", profile.id),
     ]);
 

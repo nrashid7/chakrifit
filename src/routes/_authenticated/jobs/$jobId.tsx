@@ -1,18 +1,29 @@
 import { createFileRoute, Link, useParams } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import type { ReactNode } from "react";
 import { getJob } from "@/lib/jobs.functions";
 import { listMatches } from "@/lib/matches.functions";
 import { toggleSave, listSaved } from "@/lib/saved.functions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { ExternalLink, BookmarkPlus, BookmarkCheck, ArrowLeft } from "lucide-react";
+import {
+  ArrowLeft,
+  BookmarkCheck,
+  BookmarkPlus,
+  BriefcaseBusiness,
+  CalendarClock,
+  ExternalLink,
+  GraduationCap,
+  ShieldCheck,
+  Timer,
+} from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/jobs/$jobId")({
   head: ({ params }) => ({
     meta: [
-      { title: `Job · ChakriFit` },
+      { title: "Job | ChakriFit" },
       { name: "description", content: `Eligibility details for job ${params.jobId} on ChakriFit.` },
     ],
   }),
@@ -31,8 +42,8 @@ function JobDetail() {
   const matches = useQuery({ queryKey: ["matches"], queryFn: () => matchesFn() });
   const saved = useQuery({ queryKey: ["saved"], queryFn: () => savedFn() });
 
-  if (job.isLoading) return <p className="text-center py-12 text-muted-foreground">Loading…</p>;
-  if (!job.data?.job) return <p className="text-center py-12">Job not found.</p>;
+  if (job.isLoading) return <p className="py-12 text-center text-muted-foreground">Loading...</p>;
+  if (!job.data?.job) return <p className="py-12 text-center">Job not found.</p>;
 
   const j = job.data.job as {
     id: string;
@@ -44,10 +55,19 @@ function JobDetail() {
     circular_url: string | null;
     age_limit: { min_age?: number | null; max_age?: number | null } | null;
     education_requirements: { required_degrees?: string[]; required_subjects?: string[] } | null;
-    experience_requirements: { min_experience_years?: number | null; preferred_skills?: string[] } | null;
+    experience_requirements: {
+      min_experience_years?: number | null;
+      preferred_skills?: string[];
+    } | null;
   };
   const myMatch = matches.data?.matches?.find((m: { job_id: string }) => m.job_id === jobId) as
-    | { id: string; score: number; eligibility_status: string; explanation: string | null; reasons: { positives?: string[]; negatives?: string[] } | null }
+    | {
+        id: string;
+        score: number;
+        eligibility_status: string;
+        explanation: string | null;
+        reasons: { positives?: string[]; negatives?: string[] } | null;
+      }
     | undefined;
   const isSaved = !!saved.data?.saved?.find((s: { job_id: string }) => s.job_id === jobId);
 
@@ -58,105 +78,155 @@ function JobDetail() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
-      <Link to="/dashboard" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="h-3 w-3 mr-1" /> Back to dashboard
+    <div className="mx-auto max-w-5xl space-y-6">
+      <Link
+        to="/dashboard"
+        className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
+      >
+        <ArrowLeft className="mr-1 h-3 w-3" /> Back to dashboard
       </Link>
 
-      <div className="rounded-2xl border bg-card p-6 shadow-sm">
-        <div className="flex flex-wrap items-start justify-between gap-3">
+      <section className="rounded-2xl border bg-card p-6 shadow-sm">
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_180px]">
           <div className="min-w-0">
-            <h1 className="text-2xl font-bold">{j.title}</h1>
-            <p className="text-muted-foreground mt-1">{j.organization ?? "Bangladesh government"}</p>
+            <div className="flex flex-wrap gap-2">
+              {myMatch && (
+                <Badge className="capitalize">{myMatch.eligibility_status.replace("_", " ")}</Badge>
+              )}
+              {j.deadline && (
+                <Badge variant="secondary">
+                  <CalendarClock className="h-3 w-3" />
+                  Deadline {j.deadline}
+                </Badge>
+              )}
+              {j.salary && <Badge variant="outline">{j.salary}</Badge>}
+            </div>
+            <h1 className="mt-4 text-3xl font-bold leading-tight">{j.title}</h1>
+            <p className="mt-2 text-muted-foreground">
+              {j.organization ?? "Bangladesh government"}
+            </p>
           </div>
           {myMatch && (
-            <div className={`text-2xl font-bold ${myMatch.eligibility_status === "eligible" ? "text-success" : myMatch.eligibility_status === "partial" ? "text-warning-foreground" : "text-muted-foreground"}`}>
-              {myMatch.score}%
+            <div className="rounded-xl border bg-background p-4 text-center">
+              <p className="text-xs font-medium uppercase text-muted-foreground">Your score</p>
+              <div
+                className={`mt-2 text-5xl font-bold tabular-nums ${myMatch.eligibility_status === "eligible" ? "text-success" : myMatch.eligibility_status === "partial" ? "text-warning-foreground" : "text-muted-foreground"}`}
+              >
+                {myMatch.score}%
+              </div>
             </div>
           )}
         </div>
-        <div className="mt-4 flex flex-wrap gap-2">
-          {j.deadline && <Badge variant="outline">Deadline {j.deadline}</Badge>}
-          {j.salary && <Badge variant="outline">{j.salary}</Badge>}
-          {myMatch && <Badge>{myMatch.eligibility_status.replace("_", " ")}</Badge>}
-        </div>
-        <div className="mt-5 flex flex-wrap gap-2">
+        <div className="mt-6 flex flex-col gap-2 sm:flex-row">
           {j.circular_url && (
             <a href={j.circular_url} target="_blank" rel="noreferrer">
-              <Button variant="default" size="sm" className="gap-1">
-                <ExternalLink className="h-3 w-3" /> Official circular
+              <Button className="w-full sm:w-auto">
+                <ExternalLink className="h-4 w-4" /> Official circular
               </Button>
             </a>
           )}
-          <Button variant="outline" size="sm" onClick={handleSave} className="gap-1">
+          <Button variant="outline" onClick={handleSave} className="w-full sm:w-auto">
             {isSaved ? <BookmarkCheck className="h-4 w-4" /> : <BookmarkPlus className="h-4 w-4" />}
             {isSaved ? "Saved" : "Save job"}
           </Button>
         </div>
+      </section>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <Field icon={<Timer className="h-4 w-4 text-primary" />} label="Age requirement">
+          {j.age_limit?.max_age || j.age_limit?.min_age
+            ? `${j.age_limit?.min_age ?? "Any"} to ${j.age_limit?.max_age ?? "Any"} years`
+            : "Not specified"}
+        </Field>
+        <Field icon={<GraduationCap className="h-4 w-4 text-primary" />} label="Education">
+          {j.education_requirements?.required_degrees?.length ? (
+            <span>
+              {j.education_requirements.required_degrees.join(", ")}
+              {j.education_requirements.required_subjects?.length
+                ? ` - ${j.education_requirements.required_subjects.join(", ")}`
+                : ""}
+            </span>
+          ) : (
+            "Not specified"
+          )}
+        </Field>
+        <Field icon={<BriefcaseBusiness className="h-4 w-4 text-primary" />} label="Experience">
+          {j.experience_requirements?.min_experience_years != null
+            ? `${j.experience_requirements.min_experience_years} year(s) minimum`
+            : "Not specified"}
+        </Field>
       </div>
 
-      <Field label="Age requirement">
-        {j.age_limit?.max_age || j.age_limit?.min_age
-          ? `${j.age_limit?.min_age ?? "—"} to ${j.age_limit?.max_age ?? "—"} years`
-          : "Not specified"}
-      </Field>
-
-      <Field label="Education">
-        {j.education_requirements?.required_degrees?.length
-          ? <span>{j.education_requirements.required_degrees.join(", ")}
-            {j.education_requirements.required_subjects?.length
-              ? ` — ${j.education_requirements.required_subjects.join(", ")}`
-              : ""}</span>
-          : "Not specified"}
-      </Field>
-
-      <Field label="Experience">
-        {j.experience_requirements?.min_experience_years != null
-          ? `${j.experience_requirements.min_experience_years} year(s) minimum`
-          : "Not specified"}
-        {j.experience_requirements?.preferred_skills?.length
-          ? <div className="mt-1 text-xs text-muted-foreground">Preferred skills: {j.experience_requirements.preferred_skills.join(", ")}</div>
-          : null}
-      </Field>
+      {j.experience_requirements?.preferred_skills?.length ? (
+        <Field icon={<ShieldCheck className="h-4 w-4 text-primary" />} label="Preferred skills">
+          {j.experience_requirements.preferred_skills.join(", ")}
+        </Field>
+      ) : null}
 
       {j.description && (
-        <Field label="Summary">
+        <Field icon={<ShieldCheck className="h-4 w-4 text-primary" />} label="Circular summary">
           <p className="whitespace-pre-wrap leading-relaxed">{j.description}</p>
         </Field>
       )}
 
       {myMatch && (
-        <div className="rounded-2xl border bg-accent/20 p-6">
-          <h2 className="font-semibold">Why this {myMatch.eligibility_status.replace("_", " ")} match?</h2>
+        <section className="rounded-2xl border bg-card p-6 shadow-sm">
+          <h2 className="font-semibold">
+            Why this {myMatch.eligibility_status.replace("_", " ")} match?
+          </h2>
           {myMatch.explanation ? (
-            <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed">{myMatch.explanation}</p>
+            <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
+              {myMatch.explanation}
+            </p>
           ) : (
-            <div className="mt-3 grid gap-2 sm:grid-cols-2 text-sm">
+            <div className="mt-4 grid gap-4 sm:grid-cols-2 text-sm">
               {myMatch.reasons?.positives?.length ? (
-                <div>
-                  <div className="font-medium text-success">Strengths</div>
-                  <ul className="mt-1 space-y-1">{myMatch.reasons.positives.map((p: string, i: number) => <li key={i}>✓ {p}</li>)}</ul>
-                </div>
+                <ReasonList title="Strengths" tone="success" items={myMatch.reasons.positives} />
               ) : null}
               {myMatch.reasons?.negatives?.length ? (
-                <div>
-                  <div className="font-medium text-destructive">Gaps</div>
-                  <ul className="mt-1 space-y-1">{myMatch.reasons.negatives.map((n: string, i: number) => <li key={i}>✗ {n}</li>)}</ul>
-                </div>
+                <ReasonList title="Gaps" tone="destructive" items={myMatch.reasons.negatives} />
               ) : null}
             </div>
           )}
-        </div>
+        </section>
       )}
     </div>
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, icon, children }: { label: string; icon: ReactNode; children: ReactNode }) {
   return (
-    <div className="rounded-2xl border bg-card p-5">
-      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</div>
-      <div className="mt-2 text-sm">{children}</div>
+    <section className="rounded-2xl border bg-card p-5 shadow-sm">
+      <div className="flex items-center gap-2 text-xs font-semibold uppercase text-muted-foreground">
+        {icon}
+        {label}
+      </div>
+      <div className="mt-3 text-sm">{children}</div>
+    </section>
+  );
+}
+
+function ReasonList({
+  title,
+  tone,
+  items,
+}: {
+  title: string;
+  tone: "success" | "destructive";
+  items: string[];
+}) {
+  return (
+    <div>
+      <div
+        className={tone === "success" ? "font-medium text-success" : "font-medium text-destructive"}
+      >
+        {title}
+      </div>
+      <ul className="mt-2 space-y-2 text-muted-foreground">
+        {items.map((item) => (
+          <li key={item}>{item}</li>
+        ))}
+      </ul>
     </div>
   );
 }

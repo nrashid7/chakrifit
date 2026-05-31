@@ -10,10 +10,20 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Sparkles, BookmarkPlus, ExternalLink, Loader2, RefreshCw } from "lucide-react";
+import {
+  ArrowRight,
+  BookmarkPlus,
+  CalendarClock,
+  ExternalLink,
+  FileWarning,
+  Loader2,
+  RefreshCw,
+  SearchCheck,
+  Sparkles,
+} from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
-  head: () => ({ meta: [{ title: "Your matches · ChakriFit" }] }),
+  head: () => ({ meta: [{ title: "Your matches | ChakriFit" }] }),
   component: Dashboard,
 });
 
@@ -48,7 +58,6 @@ function Dashboard() {
   const admin = useQuery({ queryKey: ["am-i-admin"], queryFn: () => adminFn() });
   const isAdmin = admin.data?.isAdmin ?? false;
 
-  // First-time onboarding redirect
   useEffect(() => {
     if (profile.isLoading) return;
     const p = profile.data;
@@ -59,7 +68,10 @@ function Dashboard() {
 
   const compute = useMutation({
     mutationFn: () => computeFn(),
-    onSuccess: () => { toast.success("Matches refreshed"); qc.invalidateQueries({ queryKey: ["matches"] }); },
+    onSuccess: () => {
+      toast.success("Matches refreshed");
+      qc.invalidateQueries({ queryKey: ["matches"] });
+    },
     onError: (e: Error) => toast.error(e.message),
   });
   const crawl = useMutation({
@@ -68,80 +80,191 @@ function Dashboard() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  if (profile.isLoading) return <div className="text-center py-12 text-muted-foreground">Loading…</div>;
+  if (profile.isLoading) return <DashboardSkeleton />;
   if (!profile.data?.profile) return null;
 
   const all = (matches.data?.matches ?? []) as MatchRow[];
   const eligible = all.filter((m) => m.eligibility_status === "eligible");
   const partial = all.filter((m) => m.eligibility_status === "partial");
   const not = all.filter((m) => m.eligibility_status === "not_eligible");
+  const best = all[0]?.score ?? 0;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">Your matches</h1>
-          <p className="text-sm text-muted-foreground">
-            {all.length} jobs scored against your profile
-          </p>
-        </div>
-        <div className="flex gap-2">
-          {isAdmin && (
-            <Button variant="outline" size="sm" onClick={() => crawl.mutate()} disabled={crawl.isPending}>
-              {crawl.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-              <span className="ml-1">Fetch new circulars</span>
-            </Button>
-          )}
-          <Button size="sm" onClick={() => compute.mutate()} disabled={compute.isPending}>
-            {compute.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-            <span className="ml-1">Recompute matches</span>
-          </Button>
-        </div>
-      </div>
-
-      {all.length === 0 ? (
-        <div className="rounded-2xl border bg-card p-8 text-center space-y-4">
-          <p className="text-muted-foreground">
-            {isAdmin
-              ? "No matches yet. Fetch new circulars or update your profile."
-              : "No matches yet. Update your profile or check back soon as new circulars are added."}
-          </p>
-          <div className="flex justify-center gap-2">
+    <div className="space-y-8">
+      <section className="rounded-2xl border bg-card p-5 shadow-sm sm:p-6">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <Badge variant="secondary" className="gap-2 rounded-full">
+              <SearchCheck className="h-3.5 w-3.5 text-primary" />
+              Resume-based eligibility
+            </Badge>
+            <h1 className="mt-3 text-3xl font-bold">Your government job matches</h1>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+              {all.length
+                ? `${all.length} circulars scored against your education, age, experience, and skills.`
+                : "No scores yet. Refresh matches or update your profile to start."}
+            </p>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row">
             {isAdmin && (
-              <Button
-                size="sm"
-                onClick={async () => {
-                  await crawl.mutateAsync();
-                  compute.mutate();
-                }}
-                disabled={crawl.isPending || compute.isPending}
-              >
-                {(crawl.isPending || compute.isPending) ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                <span className="ml-1">Fetch jobs &amp; recompute</span>
+              <Button variant="outline" onClick={() => crawl.mutate()} disabled={crawl.isPending}>
+                {crawl.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+                Fetch circulars
               </Button>
             )}
-            <Button size="sm" variant="outline" onClick={() => compute.mutate()} disabled={compute.isPending}>
-              {compute.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-              <span className="ml-1">Recompute matches</span>
+            <Button onClick={() => compute.mutate()} disabled={compute.isPending}>
+              {compute.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Sparkles className="h-4 w-4" />
+              )}
+              Recompute
             </Button>
-            <Link to="/onboarding">
-              <Button variant="outline" size="sm">Update profile</Button>
-            </Link>
           </div>
         </div>
+        <div className="mt-6 grid gap-3 sm:grid-cols-4">
+          <Metric label="Total scored" value={all.length} />
+          <Metric label="Eligible" value={eligible.length} tone="success" />
+          <Metric label="Partial" value={partial.length} tone="warning" />
+          <Metric label="Best score" value={`${best}%`} />
+        </div>
+      </section>
+
+      {all.length === 0 ? (
+        <EmptyMatches
+          isAdmin={isAdmin}
+          crawlPending={crawl.isPending}
+          computePending={compute.isPending}
+          onCrawlAndCompute={async () => {
+            await crawl.mutateAsync();
+            compute.mutate();
+          }}
+          onCompute={() => compute.mutate()}
+        />
       ) : (
-        <>
-          <Section title="Eligible" items={eligible} tone="success" toggleFn={toggleFn} explainFn={explainFn} qc={qc} />
-          <Section title="Partial match" items={partial} tone="warning" toggleFn={toggleFn} explainFn={explainFn} qc={qc} />
-          <Section title="Not eligible" items={not} tone="muted" toggleFn={toggleFn} explainFn={explainFn} qc={qc} />
-        </>
+        <div className="space-y-8">
+          <Section
+            title="Ready to apply"
+            items={eligible}
+            tone="success"
+            toggleFn={toggleFn}
+            explainFn={explainFn}
+            qc={qc}
+          />
+          <Section
+            title="Worth reviewing"
+            items={partial}
+            tone="warning"
+            toggleFn={toggleFn}
+            explainFn={explainFn}
+            qc={qc}
+          />
+          <Section
+            title="Likely not eligible"
+            items={not}
+            tone="muted"
+            toggleFn={toggleFn}
+            explainFn={explainFn}
+            qc={qc}
+          />
+        </div>
       )}
     </div>
   );
 }
 
+function DashboardSkeleton() {
+  return (
+    <div className="rounded-2xl border bg-card p-8 text-center text-muted-foreground">
+      <Loader2 className="mx-auto h-5 w-5 animate-spin text-primary" />
+      <p className="mt-3">Loading your profile and matches...</p>
+    </div>
+  );
+}
+
+function Metric({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number | string;
+  tone?: "success" | "warning";
+}) {
+  const toneClass =
+    tone === "success"
+      ? "text-success"
+      : tone === "warning"
+        ? "text-warning-foreground"
+        : "text-foreground";
+  return (
+    <div className="rounded-xl border bg-background p-4">
+      <p className="text-xs font-medium uppercase text-muted-foreground">{label}</p>
+      <p className={`mt-2 text-3xl font-bold ${toneClass}`}>{value}</p>
+    </div>
+  );
+}
+
+function EmptyMatches({
+  isAdmin,
+  crawlPending,
+  computePending,
+  onCrawlAndCompute,
+  onCompute,
+}: {
+  isAdmin: boolean;
+  crawlPending: boolean;
+  computePending: boolean;
+  onCrawlAndCompute: () => Promise<void>;
+  onCompute: () => void;
+}) {
+  return (
+    <div className="rounded-2xl border bg-card p-8 text-center shadow-sm">
+      <FileWarning className="mx-auto h-9 w-9 text-primary" />
+      <h2 className="mt-4 text-xl font-bold">No matches yet</h2>
+      <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
+        {isAdmin
+          ? "Fetch the latest circulars, recompute matches, or update your profile."
+          : "Update your profile or recompute matches after new circulars are added."}
+      </p>
+      <div className="mt-6 flex flex-col justify-center gap-2 sm:flex-row">
+        {isAdmin && (
+          <Button onClick={onCrawlAndCompute} disabled={crawlPending || computePending}>
+            {crawlPending || computePending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4" />
+            )}
+            Fetch and score jobs
+          </Button>
+        )}
+        <Button variant="outline" onClick={onCompute} disabled={computePending}>
+          {computePending ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Sparkles className="h-4 w-4" />
+          )}
+          Recompute matches
+        </Button>
+        <Link to="/onboarding">
+          <Button variant="outline">Update profile</Button>
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 function Section({
-  title, items, tone, toggleFn, explainFn, qc,
+  title,
+  items,
+  tone,
+  toggleFn,
+  explainFn,
+  qc,
 }: {
   title: string;
   items: MatchRow[];
@@ -153,12 +276,21 @@ function Section({
   if (items.length === 0) return null;
   return (
     <section>
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-3">
-        {title} · {items.length}
-      </h2>
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h2 className="text-sm font-semibold uppercase text-muted-foreground">
+          {title} ({items.length})
+        </h2>
+      </div>
+      <div className="grid gap-3">
         {items.map((m) => (
-          <MatchCard key={m.id} m={m} tone={tone} toggleFn={toggleFn} explainFn={explainFn} qc={qc} />
+          <MatchCard
+            key={m.id}
+            m={m}
+            tone={tone}
+            toggleFn={toggleFn}
+            explainFn={explainFn}
+            qc={qc}
+          />
         ))}
       </div>
     </section>
@@ -166,7 +298,11 @@ function Section({
 }
 
 function MatchCard({
-  m, tone, toggleFn, explainFn, qc,
+  m,
+  tone,
+  toggleFn,
+  explainFn,
+  qc,
 }: {
   m: MatchRow;
   tone: "success" | "warning" | "muted";
@@ -202,41 +338,70 @@ function MatchCard({
     }
   }
 
-  const toneClasses =
-    tone === "success" ? "text-success" : tone === "warning" ? "text-warning-foreground bg-warning/30 px-2 py-0.5 rounded" : "text-muted-foreground";
+  const toneClass =
+    tone === "success"
+      ? "text-success"
+      : tone === "warning"
+        ? "text-warning-foreground"
+        : "text-muted-foreground";
+  const statusLabel = m.eligibility_status.replace("_", " ");
 
   return (
     <>
-      <div className="rounded-2xl border bg-card p-5 shadow-sm hover:shadow-md transition">
-        <div className="flex items-start justify-between gap-3">
+      <article className="rounded-xl border bg-card p-4 shadow-sm transition hover:border-primary/35 hover:shadow-md sm:p-5">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_110px]">
           <div className="min-w-0">
-            <Link to="/jobs/$jobId" params={{ jobId: m.job.id }} className="hover:underline">
-              <h3 className="font-semibold truncate">{m.job.title}</h3>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant={tone === "success" ? "default" : "outline"} className="capitalize">
+                {statusLabel}
+              </Badge>
+              {m.job.deadline && (
+                <Badge variant="secondary" className="gap-1">
+                  <CalendarClock className="h-3 w-3" />
+                  {m.job.deadline}
+                </Badge>
+              )}
+              {m.job.salary && <Badge variant="outline">{m.job.salary}</Badge>}
+            </div>
+            <Link
+              to="/jobs/$jobId"
+              params={{ jobId: m.job.id }}
+              className="group mt-3 inline-flex max-w-full items-center gap-2"
+            >
+              <h3 className="truncate text-lg font-semibold group-hover:underline">
+                {m.job.title}
+              </h3>
+              <ArrowRight className="h-4 w-4 shrink-0 text-primary" />
             </Link>
-            <p className="text-xs text-muted-foreground truncate">{m.job.organization ?? "—"}</p>
+            <p className="mt-1 truncate text-sm text-muted-foreground">
+              {m.job.organization ?? "Bangladesh government"}
+            </p>
           </div>
-          <div className={`text-lg font-bold ${tone === "success" ? "text-success" : tone === "warning" ? "text-warning-foreground" : "text-muted-foreground"}`}>
-            {m.score}%
+          <div className="flex items-center justify-between gap-3 lg:flex-col lg:items-end">
+            <div className={`text-4xl font-bold tabular-nums ${toneClass}`}>{m.score}%</div>
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button size="sm" onClick={loadExplain}>
+                Why
+              </Button>
+              <Link to="/jobs/$jobId" params={{ jobId: m.job.id }}>
+                <Button size="sm" variant="outline">
+                  Details
+                </Button>
+              </Link>
+              {m.job.circular_url && (
+                <a href={m.job.circular_url} target="_blank" rel="noreferrer">
+                  <Button size="icon" variant="outline" aria-label="Open official circular">
+                    <ExternalLink className="h-4 w-4" />
+                  </Button>
+                </a>
+              )}
+              <Button size="icon" variant="ghost" onClick={handleSave} aria-label="Save job">
+                <BookmarkPlus className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </div>
-        <div className="mt-3 flex flex-wrap gap-2 text-xs">
-          {m.job.deadline && <Badge variant="outline">Deadline {m.job.deadline}</Badge>}
-          {m.job.salary && <Badge variant="outline">{m.job.salary}</Badge>}
-          <span className={toneClasses}>{m.eligibility_status.replace("_", " ")}</span>
-        </div>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Button size="sm" variant="default" onClick={loadExplain}>Why I match</Button>
-          <Link to="/jobs/$jobId" params={{ jobId: m.job.id }}>
-            <Button size="sm" variant="outline">Details</Button>
-          </Link>
-          {m.job.circular_url && (
-            <a href={m.job.circular_url} target="_blank" rel="noreferrer">
-              <Button size="sm" variant="outline"><ExternalLink className="h-3 w-3" /></Button>
-            </a>
-          )}
-          <Button size="sm" variant="ghost" onClick={handleSave}><BookmarkPlus className="h-4 w-4" /></Button>
-        </div>
-      </div>
+      </article>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
@@ -244,7 +409,10 @@ function MatchCard({
             <DialogTitle>{m.job.title}</DialogTitle>
           </DialogHeader>
           {loading ? (
-            <div className="py-6 text-center text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin inline mr-2" />Generating explanation…</div>
+            <div className="py-6 text-center text-muted-foreground">
+              <Loader2 className="mr-2 inline h-4 w-4 animate-spin" />
+              Generating explanation...
+            </div>
           ) : (
             <div className="whitespace-pre-wrap text-sm leading-relaxed">{text}</div>
           )}

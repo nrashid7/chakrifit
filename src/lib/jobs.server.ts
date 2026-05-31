@@ -103,7 +103,11 @@ export async function crawlGovernmentJobs(limit: number) {
       if (error) results.push({ url, ok: false, error: error.message });
       else results.push({ url, ok: true });
     } catch (error) {
-      results.push({ url, ok: false, error: error instanceof Error ? error.message : String(error) });
+      results.push({
+        url,
+        ok: false,
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 

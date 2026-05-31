@@ -3,7 +3,12 @@
 
 export type ParsedProfile = {
   age?: number | null;
-  education?: Array<{ degree?: string; subject?: string; institution?: string; graduation_year?: number }>;
+  education?: Array<{
+    degree?: string;
+    subject?: string;
+    institution?: string;
+    graduation_year?: number;
+  }>;
   experience?: Array<{ title?: string; company?: string; years?: number }>;
   skills?: string[];
   location?: string;
@@ -25,8 +30,19 @@ export type MatchResult = {
 };
 
 const DEGREE_RANK: Record<string, number> = {
-  ssc: 1, hsc: 2, diploma: 3, bachelor: 4, bsc: 4, ba: 4, bba: 4, beng: 4,
-  master: 5, msc: 5, ma: 5, mba: 5, phd: 6,
+  ssc: 1,
+  hsc: 2,
+  diploma: 3,
+  bachelor: 4,
+  bsc: 4,
+  ba: 4,
+  bba: 4,
+  beng: 4,
+  master: 5,
+  msc: 5,
+  ma: 5,
+  mba: 5,
+  phd: 6,
 };
 
 function normalize(s?: string): string {
@@ -74,7 +90,9 @@ export function computeMatch(profile: ParsedProfile, req: JobRequirements): Matc
     score += 35;
     positives.push(`Your education level meets the required ${req.required_degrees?.join(" / ")}`);
   } else {
-    negatives.push(`Requires ${req.required_degrees?.join(" / ")}, your highest is ${userMaxRank ? "lower" : "missing"}`);
+    negatives.push(
+      `Requires ${req.required_degrees?.join(" / ")}, your highest is ${userMaxRank ? "lower" : "missing"}`,
+    );
     hardFail = true;
   }
 
@@ -100,7 +118,9 @@ export function computeMatch(profile: ParsedProfile, req: JobRequirements): Matc
     if (req.min_experience_years === 0) positives.push("No prior experience required");
   } else if (userYears >= req.min_experience_years) {
     score += 15;
-    positives.push(`You have ${userYears} years of experience (requires ${req.min_experience_years})`);
+    positives.push(
+      `You have ${userYears} years of experience (requires ${req.min_experience_years})`,
+    );
   } else {
     negatives.push(`Requires ${req.min_experience_years} years experience; you have ${userYears}`);
   }

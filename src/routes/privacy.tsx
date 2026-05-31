@@ -1,74 +1,86 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import type { ReactNode } from "react";
 import { SiteHeader, SiteFooter } from "@/components/site-chrome";
 import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/privacy")({
   head: () => ({
     meta: [
-      { title: "Privacy · ChakriFit" },
-      { name: "description", content: "How ChakriFit stores your resume, parses it with AI, and lets you delete it at any time." },
+      { title: "Privacy | ChakriFit" },
+      {
+        name: "description",
+        content:
+          "How ChakriFit stores your resume, parses it with AI, and lets you delete it at any time.",
+      },
     ],
   }),
   component: () => (
-    <div className="min-h-screen flex flex-col">
-      <SiteHeader right={<Link to="/"><Button variant="ghost" size="sm">Home</Button></Link>} />
-      <main className="flex-1 mx-auto max-w-2xl px-4 py-10 space-y-6 text-sm leading-relaxed">
-        <h1 className="text-3xl font-bold">Privacy</h1>
+    <div className="flex min-h-screen flex-col">
+      <SiteHeader
+        right={
+          <Link to="/">
+            <Button variant="ghost" size="sm">
+              Home
+            </Button>
+          </Link>
+        }
+      />
+      <main className="mx-auto max-w-3xl flex-1 space-y-6 px-4 py-10 text-sm leading-relaxed sm:px-6">
+        <div className="rounded-2xl border bg-card p-6 shadow-sm">
+          <p className="text-sm font-semibold uppercase text-primary">Trust and data</p>
+          <h1 className="mt-2 text-3xl font-bold">Privacy</h1>
+        </div>
         <p className="text-muted-foreground">Last updated: May 2026</p>
 
-        <section>
-          <h2 className="text-lg font-semibold">What we collect</h2>
-          <ul className="list-disc pl-5 mt-2 space-y-1 text-muted-foreground">
-            <li>Your email address (for sign-in).</li>
+        <PolicySection title="What we collect">
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
+            <li>Your email address for sign-in.</li>
             <li>Your resume file and the text we extract from it.</li>
-            <li>The structured profile (name, age, education, experience, skills) parsed from your resume.</li>
+            <li>Your structured profile: name, age, education, experience, and skills.</li>
             <li>The jobs you save or mark as applied.</li>
           </ul>
-        </section>
+        </PolicySection>
 
-        <section>
-          <h2 className="text-lg font-semibold">Where it lives</h2>
-          <p className="text-muted-foreground mt-1">
-            Resume files are stored in a private Lovable Cloud storage bucket. Only you can read them.
-            Your structured profile is stored in our database with row-level security so other users cannot access it.
-          </p>
-        </section>
+        <PolicySection title="Where it lives">
+          Resume files are stored in a private cloud storage bucket. Your structured profile is
+          stored in our database with row-level security so other users cannot access it.
+        </PolicySection>
 
-        <section>
-          <h2 className="text-lg font-semibold">AI parsing</h2>
-          <p className="text-muted-foreground mt-1">
-            We send the extracted text of your resume and the text of public job circulars to an AI model
-            (Google Gemini via the Lovable AI Gateway) to extract structured fields and generate match explanations.
-            The text is not used to train any model.
-          </p>
-        </section>
+        <PolicySection title="AI parsing">
+          We send extracted resume text and public job circular text to Google Gemini via the
+          Lovable AI Gateway to extract structured fields and generate match explanations. The text
+          is not used to train any model.
+        </PolicySection>
 
-        <section>
-          <h2 className="text-lg font-semibold">Deletion</h2>
-          <p className="text-muted-foreground mt-1">
-            You can delete your uploaded resume or your entire account at any time from{" "}
-            <Link to="/settings" className="underline">Settings</Link>. Deleting your account permanently
-            removes your profile, resume file, saved jobs and match history.
-          </p>
-        </section>
+        <PolicySection title="Deletion">
+          You can delete your uploaded resume or your entire account from{" "}
+          <Link to="/settings" className="underline">
+            Settings
+          </Link>
+          . Deleting your account permanently removes your profile, resume file, saved jobs, and
+          match history.
+        </PolicySection>
 
-        <section>
-          <h2 className="text-lg font-semibold">Sharing</h2>
-          <p className="text-muted-foreground mt-1">
-            We never sell or share your personal data. Job circulars displayed on ChakriFit are crawled
-            from the publicly available Teletalk government jobs portal.
-          </p>
-        </section>
+        <PolicySection title="Sharing">
+          We never sell or share your personal data. Job circulars displayed on ChakriFit are
+          crawled from the publicly available Teletalk government jobs portal.
+        </PolicySection>
 
-        <section>
-          <h2 className="text-lg font-semibold">Not affiliated</h2>
-          <p className="text-muted-foreground mt-1">
-            ChakriFit is an independent product. It is not affiliated with Teletalk, the Government of
-            Bangladesh, or any recruiting body.
-          </p>
-        </section>
+        <PolicySection title="Not affiliated">
+          ChakriFit is an independent product. It is not affiliated with Teletalk, the Government of
+          Bangladesh, or any recruiting body.
+        </PolicySection>
       </main>
       <SiteFooter />
     </div>
   ),
 });
+
+function PolicySection({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="rounded-xl border bg-card p-5 shadow-sm">
+      <h2 className="text-lg font-semibold">{title}</h2>
+      <div className="mt-2 text-muted-foreground">{children}</div>
+    </section>
+  );
+}

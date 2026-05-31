@@ -77,18 +77,34 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "AI-powered app matches users to Bangladesh government jobs based on their CV." },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "AI-powered app matches users to Bangladesh government jobs based on their CV." },
+      { title: "ChakriFit | AI job eligibility for Bangladesh government roles" },
+      {
+        name: "description",
+        content: "AI-powered app matches users to Bangladesh government jobs based on their CV.",
+      },
+      { name: "author", content: "ChakriFit" },
+      { property: "og:title", content: "ChakriFit" },
+      {
+        property: "og:description",
+        content: "AI-powered app matches users to Bangladesh government jobs based on their CV.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
-      { name: "twitter:site", content: "@Lovable" },
-      { name: "twitter:title", content: "Lovable App" },
-      { name: "twitter:description", content: "AI-powered app matches users to Bangladesh government jobs based on their CV." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/54521bdf-a298-4057-8c5b-2108a6a33648/id-preview-4654914f--e7519a9c-dad0-4a69-bdb1-2a34ed785998.lovable.app-1780196952367.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/54521bdf-a298-4057-8c5b-2108a6a33648/id-preview-4654914f--e7519a9c-dad0-4a69-bdb1-2a34ed785998.lovable.app-1780196952367.png" },
+      { name: "twitter:title", content: "ChakriFit" },
+      {
+        name: "twitter:description",
+        content: "AI-powered app matches users to Bangladesh government jobs based on their CV.",
+      },
+      {
+        property: "og:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/54521bdf-a298-4057-8c5b-2108a6a33648/id-preview-4654914f--e7519a9c-dad0-4a69-bdb1-2a34ed785998.lovable.app-1780196952367.png",
+      },
+      {
+        name: "twitter:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/54521bdf-a298-4057-8c5b-2108a6a33648/id-preview-4654914f--e7519a9c-dad0-4a69-bdb1-2a34ed785998.lovable.app-1780196952367.png",
+      },
     ],
     links: [
       {

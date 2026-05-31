@@ -24,7 +24,9 @@ function numberOrNull(value: unknown): number | null {
 }
 
 function stringArray(value: unknown): string[] {
-  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : [];
 }
 
 function jobToRequirements(job: JobRow): JobRequirements {
@@ -57,7 +59,11 @@ export function buildMatchRows({
     institution: string | null;
     graduation_year: number | null;
   }>;
-  experience: Array<{ title: string | null; company: string | null; years: number | string | null }>;
+  experience: Array<{
+    title: string | null;
+    company: string | null;
+    years: number | string | null;
+  }>;
   jobs: JobRow[];
 }) {
   const parsedProfile: ParsedProfile = {
@@ -127,7 +133,11 @@ export async function explainEligibilityMatch({
 }
 
 // Limit concurrency for AI calls
-async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T, idx: number) => Promise<R>): Promise<R[]> {
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T, idx: number) => Promise<R>,
+): Promise<R[]> {
   const results: R[] = new Array(items.length);
   let cursor = 0;
   async function worker() {
