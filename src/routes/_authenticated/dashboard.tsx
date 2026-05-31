@@ -5,9 +5,10 @@ import { useEffect, useState } from "react";
 import { getMyProfile } from "@/lib/resume.functions";
 import { listMatches, computeMatches, explainMatch } from "@/lib/matches.functions";
 import { toggleSave } from "@/lib/saved.functions";
-import { crawlJobs, amIAdmin, latestCrawlRun } from "@/lib/jobs.functions";
+import { crawlJobs, amIAdmin, latestCrawlRun, cancelCrawlRun } from "@/lib/jobs.functions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import {
@@ -58,6 +59,7 @@ function Dashboard() {
   const explainFn = useServerFn(explainMatch);
   const adminFn = useServerFn(amIAdmin);
   const latestRunFn = useServerFn(latestCrawlRun);
+  const cancelFn = useServerFn(cancelCrawlRun);
 
   const profile = useQuery({ queryKey: ["profile"], queryFn: () => profileFn() });
   const matches = useQuery({ queryKey: ["matches"], queryFn: () => matchesFn() });
@@ -67,6 +69,10 @@ function Dashboard() {
     queryKey: ["latest-crawl-run"],
     queryFn: () => latestRunFn(),
     enabled: isAdmin,
+    refetchInterval: (q) => {
+      const status = (q.state.data?.run as CrawlRun | null)?.status;
+      return status === "running" || status === "queued" ? 2000 : false;
+    },
   });
 
   useEffect(() => {
@@ -87,8 +93,10 @@ function Dashboard() {
   });
   const crawl = useMutation({
     mutationFn: () => crawlFn({ data: { limit: 8 } }),
+    onMutate: () => qc.invalidateQueries({ queryKey: ["latest-crawl-run"] }),
     onSuccess: (r) => {
-      toast.success(`Saved or updated ${r.succeeded} jobs`);
+      if (r.status === "cancelled") toast.info("Crawl cancelled");
+      else toast.success(`Saved or updated ${r.succeeded} jobs`);
       qc.invalidateQueries({ queryKey: ["jobs"] });
       qc.invalidateQueries({ queryKey: ["matches"] });
       qc.invalidateQueries({ queryKey: ["latest-crawl-run"] });
@@ -97,6 +105,16 @@ function Dashboard() {
       toast.error(e.message);
       qc.invalidateQueries({ queryKey: ["latest-crawl-run"] });
     },
+  });
+  const runRow = (latestRun.data?.run ?? null) as CrawlRun | null;
+  const isRunning = runRow?.status === "running" || runRow?.status === "queued";
+  const cancel = useMutation({
+    mutationFn: (runId: string) => cancelFn({ data: { runId } }),
+    onSuccess: () => {
+      toast.info("Cancelling current crawl...");
+      qc.invalidateQueries({ queryKey: ["latest-crawl-run"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   if (profile.isLoading) return <DashboardSkeleton />;
@@ -129,25 +147,20 @@ function Dashboard() {
                 <Button
                   variant="outline"
                   onClick={() => crawl.mutate()}
-                  disabled={crawl.isPending}
+                  disabled={crawl.isPending || isRunning}
                 >
-                  {crawl.isPending ? (
+                  {crawl.isPending || isRunning ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     <RefreshCw className="h-4 w-4" />
                   )}
                   Fetch circulars
                 </Button>
-                {crawl.isPending && (
+                {isRunning && runRow && (
                   <Button
                     variant="ghost"
-                    onClick={() => {
-                      crawl.reset();
-                      toast.info(
-                        "Stopped waiting. The fetch may still finish in the background.",
-                      );
-                      qc.invalidateQueries({ queryKey: ["latest-crawl-run"] });
-                    }}
+                    onClick={() => cancel.mutate(runRow.id)}
+                    disabled={cancel.isPending}
                   >
                     Cancel
                   </Button>
@@ -173,11 +186,7 @@ function Dashboard() {
       </section>
 
       {isAdmin && (
-        <CrawlStatusPanel
-          run={(latestRun.data?.run ?? null) as CrawlRun | null}
-          isLoading={latestRun.isLoading}
-          isRunning={crawl.isPending}
-        />
+        <CrawlStatusPanel run={runRow} isLoading={latestRun.isLoading} />
       )}
 
       {all.length === 0 ? (
@@ -481,10 +490,15 @@ function RequirementsBadge({ status }: { status: RequirementsStatus }) {
   return <Badge variant="outline">Verify circular</Badge>;
 }
 
+type CrawlStatus = "queued" | "running" | "completed" | "cancelled" | "failed";
+
 type CrawlRun = {
   id: string;
   started_at: string;
   finished_at: string | null;
+  updated_at: string | null;
+  status: CrawlStatus;
+  progress_message: string | null;
   discovered: number;
   attempted: number;
   succeeded: number;
@@ -492,59 +506,93 @@ type CrawlRun = {
   errors: { url: string; error: string }[] | null;
 };
 
-function CrawlStatusPanel({
-  run,
-  isLoading,
-  isRunning,
-}: {
-  run: CrawlRun | null;
-  isLoading: boolean;
-  isRunning: boolean;
-}) {
-  const errors = Array.isArray(run?.errors) ? run!.errors : [];
-  const lastRunLabel = run?.started_at
-    ? new Date(run.started_at).toLocaleString()
-    : isLoading
-      ? "Loading..."
-      : "Never";
-  const status = isRunning
-    ? { label: "Running...", tone: "warning" as const, Icon: Loader2, spin: true }
-    : run && errors.length === 0 && run.failed === 0
-      ? { label: "Healthy", tone: "success" as const, Icon: CheckCircle2, spin: false }
-      : run
-        ? { label: "Issues", tone: "warning" as const, Icon: AlertTriangle, spin: false }
-        : { label: "No runs yet", tone: "muted" as const, Icon: RefreshCw, spin: false };
+const STATUS_META: Record<
+  CrawlStatus | "none",
+  { label: string; tone: "success" | "warning" | "muted" | "danger"; Icon: typeof Loader2; spin: boolean }
+> = {
+  queued: { label: "Queued", tone: "muted", Icon: RefreshCw, spin: false },
+  running: { label: "Running", tone: "warning", Icon: Loader2, spin: true },
+  completed: { label: "Completed", tone: "success", Icon: CheckCircle2, spin: false },
+  cancelled: { label: "Cancelled", tone: "muted", Icon: AlertTriangle, spin: false },
+  failed: { label: "Failed", tone: "danger", Icon: AlertTriangle, spin: false },
+  none: { label: "No runs yet", tone: "muted", Icon: RefreshCw, spin: false },
+};
 
-  const StatusIcon = status.Icon;
+function formatTime(value?: string | null) {
+  return value ? new Date(value).toLocaleString() : "—";
+}
+
+function CrawlStatusPanel({ run, isLoading }: { run: CrawlRun | null; isLoading: boolean }) {
+  const errors = Array.isArray(run?.errors) ? run!.errors.filter((e) => e.url !== "strategy") : [];
+  const meta = STATUS_META[run?.status ?? "none"];
+  const StatusIcon = meta.Icon;
   const toneClass =
-    status.tone === "success"
+    meta.tone === "success"
       ? "text-success"
-      : status.tone === "warning"
+      : meta.tone === "warning"
         ? "text-warning-foreground"
-        : "text-muted-foreground";
+        : meta.tone === "danger"
+          ? "text-destructive"
+          : "text-muted-foreground";
+
+  const total = run?.discovered ?? 0;
+  const done = run?.attempted ?? 0;
+  const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;
+  const isLive = run?.status === "running" || run?.status === "queued";
 
   return (
     <section className="rounded-2xl border bg-card p-5 shadow-sm sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-xs font-medium uppercase text-muted-foreground">Crawler status</p>
-          <h2 className="mt-1 text-lg font-semibold">Last run: {lastRunLabel}</h2>
+          <h2 className="mt-1 text-lg font-semibold">
+            {isLoading ? "Loading..." : run?.progress_message ?? "No crawl runs yet"}
+          </h2>
         </div>
         <Badge variant="outline" className={`gap-2 ${toneClass}`}>
-          <StatusIcon className={`h-3.5 w-3.5 ${status.spin ? "animate-spin" : ""}`} />
-          {status.label}
+          <StatusIcon className={`h-3.5 w-3.5 ${meta.spin ? "animate-spin" : ""}`} />
+          {meta.label}
         </Badge>
       </div>
+
+      {run && (
+        <div className="mt-4 grid gap-3 text-xs text-muted-foreground sm:grid-cols-3">
+          <div>
+            <p className="font-medium uppercase">Started</p>
+            <p className="mt-1 text-sm text-foreground">{formatTime(run.started_at)}</p>
+          </div>
+          <div>
+            <p className="font-medium uppercase">{isLive ? "Last update" : "Finished"}</p>
+            <p className="mt-1 text-sm text-foreground">
+              {formatTime(isLive ? run.updated_at ?? run.started_at : run.finished_at)}
+            </p>
+          </div>
+          <div>
+            <p className="font-medium uppercase">Progress</p>
+            <p className="mt-1 text-sm text-foreground">
+              {done} / {total || "?"} {total > 0 ? `(${pct}%)` : ""}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {run && total > 0 && (
+        <div className="mt-4">
+          <Progress value={pct} />
+        </div>
+      )}
+
       <div className="mt-5 grid gap-3 sm:grid-cols-4">
         <Metric label="URLs found" value={run?.discovered ?? 0} />
-        <Metric label="Scrape attempts" value={run?.attempted ?? 0} />
+        <Metric label="Attempts" value={run?.attempted ?? 0} />
         <Metric label="Saved" value={run?.succeeded ?? 0} tone="success" />
         <Metric
           label="Errors"
-          value={run?.failed ?? errors.length}
-          tone={errors.length > 0 || (run?.failed ?? 0) > 0 ? "warning" : undefined}
+          value={run?.failed ?? 0}
+          tone={(run?.failed ?? 0) > 0 ? "warning" : undefined}
         />
       </div>
+
       {errors.length > 0 && (
         <div className="mt-5">
           <p className="text-xs font-medium uppercase text-muted-foreground">
