@@ -85,6 +85,6 @@ export const explainMatch = createServerFn({ method: "POST" })
       negatives: reasons.negatives ?? [],
     });
 
-    await supabase.from("matches").update({ explanation: text }).eq("id", match.id);
+    await supabaseAdmin.from("matches").update({ explanation: text }).eq("id", match.id);
     return { explanation: text };
   });
