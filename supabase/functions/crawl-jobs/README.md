@@ -2,6 +2,12 @@
 
 Daily background crawler for Bangladesh government job circulars.
 
+> **Admin note:** This daily crawler is **not active by default**. It only runs
+> once you execute the `pg_cron` SQL snippet at the bottom of this file inside
+> your Supabase project (SQL editor). Until then, new circulars only arrive via
+> the in-app "Fetch new circulars" button on the dashboard, which calls the
+> internal server crawler directly (no `CRON_SECRET` needed).
+
 ## What it does
 
 1. Calls Firecrawl `/v2/map` to discover circular URLs under the Teletalk
