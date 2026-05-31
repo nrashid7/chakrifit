@@ -185,9 +185,7 @@ function Dashboard() {
         </div>
       </section>
 
-      {isAdmin && (
-        <CrawlStatusPanel run={runRow} isLoading={latestRun.isLoading} />
-      )}
+      {isAdmin && <CrawlStatusPanel run={runRow} isLoading={latestRun.isLoading} />}
 
       {all.length === 0 ? (
         <EmptyMatches
@@ -508,7 +506,12 @@ type CrawlRun = {
 
 const STATUS_META: Record<
   CrawlStatus | "none",
-  { label: string; tone: "success" | "warning" | "muted" | "danger"; Icon: typeof Loader2; spin: boolean }
+  {
+    label: string;
+    tone: "success" | "warning" | "muted" | "danger";
+    Icon: typeof Loader2;
+    spin: boolean;
+  }
 > = {
   queued: { label: "Queued", tone: "muted", Icon: RefreshCw, spin: false },
   running: { label: "Running", tone: "warning", Icon: Loader2, spin: true },
@@ -546,7 +549,7 @@ function CrawlStatusPanel({ run, isLoading }: { run: CrawlRun | null; isLoading:
         <div>
           <p className="text-xs font-medium uppercase text-muted-foreground">Crawler status</p>
           <h2 className="mt-1 text-lg font-semibold">
-            {isLoading ? "Loading..." : run?.progress_message ?? "No crawl runs yet"}
+            {isLoading ? "Loading..." : (run?.progress_message ?? "No crawl runs yet")}
           </h2>
         </div>
         <Badge variant="outline" className={`gap-2 ${toneClass}`}>
@@ -564,7 +567,7 @@ function CrawlStatusPanel({ run, isLoading }: { run: CrawlRun | null; isLoading:
           <div>
             <p className="font-medium uppercase">{isLive ? "Last update" : "Finished"}</p>
             <p className="mt-1 text-sm text-foreground">
-              {formatTime(isLive ? run.updated_at ?? run.started_at : run.finished_at)}
+              {formatTime(isLive ? (run.updated_at ?? run.started_at) : run.finished_at)}
             </p>
           </div>
           <div>

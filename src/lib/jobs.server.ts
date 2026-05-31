@@ -5,20 +5,37 @@ const MEDIA_BASE = "https://alljobs.teletalk.com.bd/media";
 const SITE_BASE = "https://alljobs.teletalk.com.bd";
 const MAX_PDF_ENRICHMENTS_PER_RUN = 20;
 
-type RequirementsStatus = "parsed" | "partial" | "unknown";
+export type RequirementsStatus = "parsed" | "partial" | "unknown";
 
 export type ParsedPdfRequirements = {
+  matched_post_title: string | null;
+  post_match_confidence: number | null;
   required_degrees: string[];
   required_subjects: string[];
+  minimum_gpa_or_class: string | null;
+  education_notes: string | null;
   min_experience_years: number | null;
+  experience_notes: string | null;
   preferred_skills: string[];
   salary_scale: string | null;
+  grade: string | null;
   quota_info: string | null;
+  district_restrictions: string | null;
+  gender_restrictions: string | null;
   min_age: number | null;
   max_age: number | null;
+  age_cutoff_date: string | null;
+  age_relaxation: string | null;
   vacancy: string | null;
   application_fee: string | null;
+  application_start: string | null;
+  application_deadline: string | null;
+  application_url: string | null;
+  selection_process: string | null;
+  documents_required: string[];
+  special_conditions: string[];
   confidence_score: number | null;
+  requirements_status: RequirementsStatus | null;
   parse_notes: string | null;
   ocr_text_excerpt?: string | null;
 };
@@ -46,6 +63,10 @@ type MistralRequestContext = {
   pdfUrl?: string | null;
   jobId?: string | number | null;
   jobTitle?: string | null;
+  organization?: string | null;
+  advertisementNo?: string | null;
+  vacancy?: string | null;
+  deadline?: string | null;
 };
 
 export async function listJobsFromDb() {
@@ -157,21 +178,21 @@ function toIsoDate(value?: string | null): string | null {
   return d.toISOString().slice(0, 10);
 }
 
-function asRecord(value: unknown): Record<string, unknown> {
+export function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : {};
 }
 
-function stringOrNull(value: unknown): string | null {
+export function stringOrNull(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
-function numberOrNull(value: unknown): number | null {
+export function numberOrNull(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
-function stringArray(value: unknown): string[] {
+export function stringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value
     .filter((item): item is string => typeof item === "string" && item.trim().length > 0)
@@ -180,18 +201,37 @@ function stringArray(value: unknown): string[] {
 
 function normalizeParsedPdf(value: unknown, ocrText: string): ParsedPdfRequirements {
   const record = asRecord(value);
+  const status = stringOrNull(record.requirements_status);
   return {
+    matched_post_title: stringOrNull(record.matched_post_title),
+    post_match_confidence: numberOrNull(record.post_match_confidence),
     required_degrees: stringArray(record.required_degrees),
     required_subjects: stringArray(record.required_subjects),
+    minimum_gpa_or_class: stringOrNull(record.minimum_gpa_or_class),
+    education_notes: stringOrNull(record.education_notes),
     min_experience_years: numberOrNull(record.min_experience_years),
+    experience_notes: stringOrNull(record.experience_notes),
     preferred_skills: stringArray(record.preferred_skills),
     salary_scale: stringOrNull(record.salary_scale),
+    grade: stringOrNull(record.grade),
     quota_info: stringOrNull(record.quota_info),
+    district_restrictions: stringOrNull(record.district_restrictions),
+    gender_restrictions: stringOrNull(record.gender_restrictions),
     min_age: numberOrNull(record.min_age),
     max_age: numberOrNull(record.max_age),
+    age_cutoff_date: stringOrNull(record.age_cutoff_date),
+    age_relaxation: stringOrNull(record.age_relaxation),
     vacancy: stringOrNull(record.vacancy),
     application_fee: stringOrNull(record.application_fee),
+    application_start: stringOrNull(record.application_start),
+    application_deadline: stringOrNull(record.application_deadline),
+    application_url: stringOrNull(record.application_url),
+    selection_process: stringOrNull(record.selection_process),
+    documents_required: stringArray(record.documents_required),
+    special_conditions: stringArray(record.special_conditions),
     confidence_score: numberOrNull(record.confidence_score),
+    requirements_status:
+      status === "parsed" || status === "partial" || status === "unknown" ? status : null,
     parse_notes: stringOrNull(record.parse_notes),
     ocr_text_excerpt: ocrText.slice(0, 1000) || null,
   };
@@ -263,22 +303,53 @@ export async function parsePdfWithMistral(
     throw new Error("Mistral OCR returned too little text from the circular PDF");
   }
 
-  const prompt = `Extract job requirements from this Bangladesh government job circular text. Return ONLY valid JSON:
+  const prompt = `You are extracting requirements for ONE specific post only.
+
+Post title: ${context.jobTitle ?? "null"}
+Organization: ${context.organization ?? "null"}
+Advertisement No: ${context.advertisementNo ?? "null"}
+Vacancy: ${context.vacancy ?? "null"}
+Deadline: ${context.deadline ?? "null"}
+
+This circular PDF may list multiple posts. Find the section/row for this exact post title. Do NOT merge requirements from other posts. If you cannot find this exact post, set requirements_status to "partial" and explain in parse_notes.
+
+Extract job requirements from this Bangladesh government job circular text. Return ONLY valid JSON:
 {
-  "required_degrees": ["list degree names in English, e.g. BSc, BBA, SSC, HSC"],
-  "required_subjects": ["specific subject/major if mentioned, or empty array"],
-  "min_experience_years": 0,
-  "preferred_skills": ["skills if mentioned, or empty array"],
+  "matched_post_title": "string or null",
+  "post_match_confidence": 0.95,
+  "required_degrees": ["degree level only e.g. BSc, MSc, SSC, HSC, Diploma"],
+  "required_subjects": ["discipline/major only e.g. Computer Science, Accounting"],
+  "minimum_gpa_or_class": "string or null e.g. minimum GPA 2.5 or Second Class",
+  "education_notes": "string or null for any extra education conditions",
+  "min_experience_years": null,
+  "experience_notes": "string or null",
+  "preferred_skills": [],
   "salary_scale": "grade and pay range as string e.g. Grade-13, 11000-26590 BDT",
-  "quota_info": "any district/freedom fighter/quota details as string, or null",
-  "min_age": 18,
-  "max_age": 32,
+  "grade": "string or null e.g. Grade-13",
+  "quota_info": "string or null",
+  "district_restrictions": "string or null",
+  "gender_restrictions": "string or null",
+  "min_age": null,
+  "max_age": null,
+  "age_cutoff_date": "string or null e.g. must be under 30 as of 01 June 2025",
+  "age_relaxation": "string or null e.g. up to 32 for freedom fighters' children",
   "vacancy": "vacancy count as string or null",
   "application_fee": "application fee as string or null",
+  "application_start": "string or null YYYY-MM-DD",
+  "application_deadline": "string or null YYYY-MM-DD",
+  "application_url": "string or null",
+  "selection_process": "string or null e.g. written test + viva",
+  "documents_required": [],
+  "special_conditions": [],
   "confidence_score": 0.0,
+  "requirements_status": "parsed",
   "parse_notes": "short note if fields are unclear"
 }
 Rules:
+- required_degrees must contain ONLY degree level names, such as BSc, MSc, SSC, HSC, Diploma, Bachelor, Master, MBA, BBA.
+- required_degrees must never include subject names.
+- required_subjects must contain ONLY discipline/major names, such as Computer Science, Accounting, Economics, Mathematics.
+- required_subjects must never include degree prefixes.
 - Handle both Bangla and English.
 - If a field is not mentioned, use null or empty array.
 - Do not guess.
@@ -305,8 +376,9 @@ ${fullText.slice(0, 12000)}`;
   return normalizeParsedPdf(parsed, fullText);
 }
 
-function requirementsStatus(parsed: ParsedPdfRequirements | null): RequirementsStatus {
+export function requirementsStatus(parsed: ParsedPdfRequirements | null): RequirementsStatus {
   if (!parsed) return "unknown";
+  const modelStatus = parsed.requirements_status;
   const hasKeyRequirements =
     parsed.required_degrees.length > 0 ||
     parsed.required_subjects.length > 0 ||
@@ -314,19 +386,41 @@ function requirementsStatus(parsed: ParsedPdfRequirements | null): RequirementsS
     parsed.preferred_skills.length > 0 ||
     parsed.min_age != null ||
     parsed.max_age != null;
-  if (hasKeyRequirements) return "parsed";
   const hasSupportingData =
     parsed.salary_scale != null ||
+    parsed.grade != null ||
     parsed.quota_info != null ||
+    parsed.district_restrictions != null ||
+    parsed.gender_restrictions != null ||
     parsed.vacancy != null ||
-    parsed.application_fee != null;
-  return hasSupportingData ? "partial" : "unknown";
+    parsed.application_fee != null ||
+    parsed.application_start != null ||
+    parsed.application_deadline != null ||
+    parsed.selection_process != null ||
+    parsed.documents_required.length > 0 ||
+    parsed.special_conditions.length > 0;
+  const heuristic = hasKeyRequirements ? "parsed" : hasSupportingData ? "partial" : "unknown";
+  const status = modelStatus ?? heuristic;
+  if (
+    status === "parsed" &&
+    parsed.post_match_confidence != null &&
+    parsed.post_match_confidence < 0.5
+  ) {
+    return "partial";
+  }
+  return status;
 }
 
 function shouldSkipOcr(existing: ExistingJob | undefined, pdfUrl: string | null): boolean {
   if (!existing || !pdfUrl) return false;
   const parsedJson = asRecord(existing.parsed_json);
-  return parsedJson.circular_pdf_url === pdfUrl && parsedJson.requirements_status === "parsed";
+  const llm = asRecord(parsedJson.llm);
+  const confidence = numberOrNull(llm.post_match_confidence);
+  return (
+    parsedJson.circular_pdf_url === pdfUrl &&
+    parsedJson.requirements_status === "parsed" &&
+    (confidence == null || confidence >= 0.8)
+  );
 }
 
 function delay(ms: number) {
@@ -338,6 +432,37 @@ function withResolvedAdvertisementFile(detail: TeletalkDetail, pdfUrl: string | 
     ...detail,
     advertisement_file: pdfUrl ?? detail.advertisement_file ?? null,
   };
+}
+
+export function buildJobDescription({
+  advertisementNo,
+  parsed,
+  apiVacancy,
+}: {
+  advertisementNo?: string | null;
+  parsed: ParsedPdfRequirements | null;
+  apiVacancy?: string | null;
+}) {
+  return (
+    [
+      advertisementNo && `Advertisement: ${advertisementNo}`,
+      (parsed?.vacancy || apiVacancy) && `Vacancy: ${parsed?.vacancy || apiVacancy}`,
+      (parsed?.grade || parsed?.salary_scale) &&
+        `Grade/pay scale: ${[parsed?.grade, parsed?.salary_scale].filter(Boolean).join(", ")}`,
+      parsed?.application_fee && `Application fee: ${parsed.application_fee}`,
+      parsed?.application_start && `Application starts: ${parsed.application_start}`,
+      parsed?.application_deadline && `Application deadline: ${parsed.application_deadline}`,
+      parsed?.age_cutoff_date && `Age cutoff date: ${parsed.age_cutoff_date}`,
+      parsed?.age_relaxation && `Age relaxation: ${parsed.age_relaxation}`,
+      parsed?.quota_info && `Quota: ${parsed.quota_info}`,
+      parsed?.district_restrictions && `District restrictions: ${parsed.district_restrictions}`,
+      parsed?.gender_restrictions && `Gender restrictions: ${parsed.gender_restrictions}`,
+      parsed?.selection_process && `Selection process: ${parsed.selection_process}`,
+      parsed?.parse_notes && `Parse notes: ${parsed.parse_notes}`,
+    ]
+      .filter(Boolean)
+      .join("\n") || null
+  );
 }
 
 /**
@@ -472,6 +597,10 @@ export async function crawlGovernmentJobs(limit: number, triggeredBy?: string) {
           parsed = await parsePdfWithMistral(pdfUrl, {
             jobId: detail.id,
             jobTitle: detail.job_title,
+            organization: detail.job_utilities_govtorganization?.name ?? null,
+            advertisementNo: detail.advertisement_no ?? null,
+            vacancy: detail.vacancy ?? null,
+            deadline: detail.deadline_date ?? null,
           });
           status = requirementsStatus(parsed);
           if (parsed && status !== "unknown") enriched += 1;
@@ -546,17 +675,11 @@ export async function crawlGovernmentJobs(limit: number, triggeredBy?: string) {
           external_job_id: externalId,
           title: detail.job_title,
           organization: orgName,
-          description:
-            [
-              detail.advertisement_no && `Advertisement: ${detail.advertisement_no}`,
-              (parsed?.vacancy || detail.vacancy) &&
-                `Vacancy: ${parsed?.vacancy || detail.vacancy}`,
-              parsed?.quota_info && `Quota: ${parsed.quota_info}`,
-              parsed?.application_fee && `Application fee: ${parsed.application_fee}`,
-              parsed?.parse_notes && `Parse notes: ${parsed.parse_notes}`,
-            ]
-              .filter(Boolean)
-              .join("\n") || null,
+          description: buildJobDescription({
+            advertisementNo: detail.advertisement_no,
+            parsed,
+            apiVacancy: detail.vacancy,
+          }),
           deadline: toIsoDate(detail.deadline_date),
           salary: parsed?.salary_scale ?? existingJob?.salary ?? null,
           age_limit: ageLimit,
@@ -660,4 +783,3 @@ export async function cancelCrawlRunInDb(runId: string) {
   if (error) throw new Error(error.message);
   return { cancelled: !!data, run: data };
 }
-

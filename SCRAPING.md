@@ -44,6 +44,13 @@ fee, and salary details often live inside the official advertisement PDF. When
    response mode.
 4. Saves normalized requirements into the existing `jobs` table.
 
+Extraction is post-specific. Teletalk circular PDFs can contain multiple posts,
+so the Mistral Small prompt includes the Teletalk job title, organization,
+advertisement number, vacancy, and deadline. The parser is instructed to find
+the exact post section or row and not merge requirements from other posts in
+the same PDF. If the exact post cannot be found, the parser returns
+`requirements_status = partial` with notes.
+
 The OCR request uses Mistral's document URL schema:
 
 ```json
@@ -75,6 +82,12 @@ Firecrawl is no longer required.
 | `source_url`              | Teletalk application site, job source, or PDF URL                 |
 | `parsed_json`             | Teletalk API payload, Mistral result, status, method, and PDF URL |
 
+Expanded extraction fields, including GPA/class requirements, education notes,
+grade, age cutoff/relaxation, quota and district restrictions, application
+dates, selection process, required documents, special conditions, confidence,
+and matched post title are stored in `parsed_json.llm`. No additional database
+columns are required for these detailed fields.
+
 ## Requirement Status
 
 `parsed_json.requirements_status` is:
@@ -90,9 +103,17 @@ The UI labels unknown fields as `Not parsed yet - verify official circular`.
 
 - A manual or scheduled crawl enriches at most 20 PDFs.
 - Existing rows are not re-parsed when the same `circular_pdf_url` already has
-  `requirements_status = parsed`.
+  `requirements_status = parsed` and high post-match confidence.
 - OCR calls run sequentially with a one second delay between PDFs.
 - A failed OCR parse does not block saving the API-only job row.
+
+## Admin Re-parse
+
+Admins can re-parse a single job from the job detail page. The action uses the
+existing official PDF URL, bypasses the crawler skip rule for that one job, and
+updates only that job's requirements, description, and `parsed_json.llm`.
+Normal users cannot see the button, and direct server calls are rejected unless
+the authenticated user's email matches `ADMIN_EMAIL`.
 
 ## Required Secrets
 
