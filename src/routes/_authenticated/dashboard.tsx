@@ -143,7 +143,7 @@ function Dashboard() {
           <Metric label="Total scored" value={all.length} />
           <Metric label="Eligible" value={eligible.length} tone="success" />
           <Metric label="Partial" value={partial.length} tone="warning" />
-          <Metric label="Best score" value={`${best}%`} />
+          <Metric label="Best score" value={`${bestScore}%`} />
         </div>
       </section>
 
