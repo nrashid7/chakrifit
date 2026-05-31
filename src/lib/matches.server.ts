@@ -5,25 +5,35 @@ import { createLovableAiGatewayProvider, requireLovableApiKey } from "./ai-gatew
 
 type JobRow = {
   id: string;
-  age_limit: { max_age?: number | null; min_age?: number | null } | null;
-  education_requirements: {
-    required_degrees?: string[];
-    required_subjects?: string[];
-  } | null;
-  experience_requirements: {
-    min_experience_years?: number | null;
-    preferred_skills?: string[];
-  } | null;
+  age_limit: unknown;
+  education_requirements: unknown;
+  experience_requirements: unknown;
 };
 
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+
+function numberOrNull(value: unknown): number | null {
+  return typeof value === "number" ? value : null;
+}
+
+function stringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
 function jobToRequirements(job: JobRow): JobRequirements {
+  const age = asRecord(job.age_limit);
+  const education = asRecord(job.education_requirements);
+  const experience = asRecord(job.experience_requirements);
+
   return {
-    max_age: job.age_limit?.max_age ?? null,
-    min_age: job.age_limit?.min_age ?? null,
-    required_degrees: job.education_requirements?.required_degrees ?? [],
-    required_subjects: job.education_requirements?.required_subjects ?? [],
-    min_experience_years: job.experience_requirements?.min_experience_years ?? null,
-    preferred_skills: job.experience_requirements?.preferred_skills ?? [],
+    max_age: numberOrNull(age.max_age),
+    min_age: numberOrNull(age.min_age),
+    required_degrees: stringArray(education.required_degrees),
+    required_subjects: stringArray(education.required_subjects),
+    min_experience_years: numberOrNull(experience.min_experience_years),
+    preferred_skills: stringArray(experience.preferred_skills),
   };
 }
 
