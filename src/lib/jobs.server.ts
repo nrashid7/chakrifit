@@ -141,5 +141,45 @@ export async function crawlGovernmentJobs(limit: number, triggeredBy?: string) {
     }
   }
 
-  return { discovered: urls.length, attempted: toScrape.length, results };
+  const succeeded = results.filter((r) => r.ok).length;
+  const failed = results.length - succeeded;
+  const errorList = [
+    ...mapErrors,
+    ...results.filter((r) => !r.ok).map((r) => ({ url: r.url, error: r.error ?? "Unknown error" })),
+  ];
+
+  const { data: runRow } = await supabaseAdmin
+    .from("crawl_runs")
+    .insert({
+      started_at: startedAt,
+      finished_at: new Date().toISOString(),
+      discovered: urls.length,
+      attempted: toScrape.length,
+      succeeded,
+      failed,
+      errors: errorList,
+      triggered_by: triggeredBy ?? null,
+    })
+    .select("id")
+    .maybeSingle();
+
+  return {
+    runId: runRow?.id ?? null,
+    discovered: urls.length,
+    attempted: toScrape.length,
+    succeeded,
+    failed,
+    results,
+  };
+}
+
+export async function getLatestCrawlRun() {
+  const { data, error } = await supabaseAdmin
+    .from("crawl_runs")
+    .select("*")
+    .order("started_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return { run: data };
 }
