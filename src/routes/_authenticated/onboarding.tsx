@@ -25,6 +25,7 @@ import {
   Upload,
   X,
 } from "lucide-react";
+import { useT } from "@/i18n";
 
 export const Route = createFileRoute("/_authenticated/onboarding")({
   head: () => ({ meta: [{ title: "Get started | ChakriFit" }] }),
@@ -40,6 +41,7 @@ type Edu = {
 type Exp = { title?: string | null; company?: string | null; years?: number | null };
 
 function Onboarding() {
+  const t = useT();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const profileFn = useServerFn(getMyProfile);
@@ -87,7 +89,7 @@ function Onboarding() {
       setEducation(parsed.education ?? []);
       setExperience(parsed.experience ?? []);
       setStep(3);
-      toast.success("Resume parsed. Review your details below.");
+      toast.success(t("onboard.parsedSuccess"));
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to parse resume");
       setStep(1);
@@ -131,7 +133,7 @@ function Onboarding() {
     onSuccess: (r) => {
       qc.invalidateQueries({ queryKey: ["profile"] });
       qc.invalidateQueries({ queryKey: ["matches"] });
-      toast.success(`Found ${r.matchCount ?? 0} jobs scored against your profile`);
+      toast.success(t("onboard.jobsFound", { count: r.matchCount ?? 0 }));
       navigate({ to: "/dashboard" });
     },
     onError: (e: Error) => {
@@ -145,9 +147,7 @@ function Onboarding() {
       (e) => (e.degree && e.degree.trim()) || (e.subject && e.subject.trim()),
     );
     if (validEdu.length === 0) {
-      toast.error(
-        "Add at least one education entry with a degree or subject. Institution or year alone is not enough.",
-      );
+      toast.error(t("onboard.educationError"));
       return;
     }
     finish.mutate();
@@ -157,7 +157,7 @@ function Onboarding() {
     return (
       <div className="mx-auto max-w-5xl py-16 text-center text-muted-foreground">
         <Loader2 className="mx-auto h-5 w-5 animate-spin text-primary" />
-        <p className="mt-3 text-sm">Loading your profile...</p>
+        <p className="mt-3 text-sm">{t("onboard.loadingProfile")}</p>
       </div>
     );
   }
@@ -169,15 +169,14 @@ function Onboarding() {
   return (
     <div className="mx-auto max-w-5xl space-y-8">
       <div className="rounded-2xl border bg-card p-6 shadow-sm">
-        <p className="text-sm font-semibold uppercase text-primary">Profile setup</p>
-        <h1 className="mt-2 text-3xl font-bold">Turn your resume into a job-match profile</h1>
+        <p className="text-sm font-semibold uppercase text-primary">{t("onboard.badge")}</p>
+        <h1 className="mt-2 text-3xl font-bold">{t("onboard.title")}</h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-          Upload your CV, review what ChakriFit extracts, then score available circulars against
-          your profile.
+          {t("onboard.subtitle")}
         </p>
       </div>
 
-      <Stepper step={step} />
+      <Stepper step={step} t={t} />
 
       {step === 1 && (
         <label className="block cursor-pointer rounded-2xl border-2 border-dashed border-primary/30 bg-card p-10 text-center shadow-sm transition hover:bg-accent/40">
@@ -193,47 +192,36 @@ function Onboarding() {
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
             <Upload className="h-7 w-7" />
           </div>
-          <div className="mt-4 text-lg font-semibold">Upload your resume</div>
-          <div className="mt-2 text-sm text-muted-foreground">
-            PDF, DOCX, or TXT. English, Bangla, and mixed-language resumes are supported.
-          </div>
+          <div className="mt-4 text-lg font-semibold">{t("onboard.upload")}</div>
+          <div className="mt-2 text-sm text-muted-foreground">{t("onboard.uploadHint")}</div>
         </label>
       )}
 
-      {step === 2 && (
-        <Processing
-          title="Reading and parsing your resume..."
-          body="This usually takes 5 to 15 seconds."
-        />
-      )}
-      {step === 4 && (
-        <Processing
-          title="Matching your profile to government jobs..."
-          body="Scoring every circular and generating explanations."
-        />
-      )}
+      {step === 2 && <Processing title={t("onboard.parsing")} body={t("onboard.parsingHint")} />}
+      {step === 4 && <Processing title={t("onboard.matching")} body={t("onboard.matchingHint")} />}
 
       {step === 3 && (
         <div className="space-y-5 rounded-2xl border bg-card p-5 shadow-sm sm:p-6">
           <div>
-            <h2 className="text-xl font-semibold">Review what we found</h2>
-            <p className="text-sm text-muted-foreground">
-              Fix anything that looks wrong before scoring jobs.
-            </p>
+            <h2 className="text-xl font-semibold">{t("onboard.reviewTitle")}</h2>
+            <p className="text-sm text-muted-foreground">{t("onboard.reviewHint")}</p>
           </div>
 
-          <Panel title="Basic profile" icon={<FileText className="h-4 w-4 text-primary" />}>
+          <Panel
+            title={t("onboard.basicProfile")}
+            icon={<FileText className="h-4 w-4 text-primary" />}
+          >
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
-                <Label>Full name</Label>
+                <Label>{t("onboard.fullName")}</Label>
                 <Input value={fullName} onChange={(e) => setFullName(e.target.value)} />
               </div>
               <div>
-                <Label>Location</Label>
+                <Label>{t("onboard.location")}</Label>
                 <Input value={location} onChange={(e) => setLocation(e.target.value)} />
               </div>
               <div>
-                <Label>Age</Label>
+                <Label>{t("onboard.age")}</Label>
                 <Input
                   type="number"
                   value={age}
@@ -243,33 +231,34 @@ function Onboarding() {
             </div>
           </Panel>
 
-          <Panel title="Skills" icon={<Sparkles className="h-4 w-4 text-primary" />}>
-            <Label>Skills (comma-separated)</Label>
+          <Panel title={t("onboard.skills")} icon={<Sparkles className="h-4 w-4 text-primary" />}>
+            <Label>{t("onboard.skillsHint")}</Label>
             <Textarea value={skills} onChange={(e) => setSkills(e.target.value)} rows={2} />
           </Panel>
 
-          <Panel title="Education" icon={<GraduationCap className="h-4 w-4 text-primary" />}>
+          <Panel
+            title={t("onboard.education")}
+            icon={<GraduationCap className="h-4 w-4 text-primary" />}
+          >
             <div className="mb-3 flex items-center justify-between">
-              <Label>Required for scoring</Label>
+              <Label>{t("onboard.educationRequired")}</Label>
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 onClick={() => setEducation([...education, {}])}
               >
-                <Plus className="h-3 w-3" /> Add
+                <Plus className="h-3 w-3" /> {t("onboard.add")}
               </Button>
             </div>
             {education.length === 0 && (
-              <p className="text-xs text-destructive">
-                Add at least one education entry to continue.
-              </p>
+              <p className="text-xs text-destructive">{t("onboard.educationEmpty")}</p>
             )}
             <div className="space-y-2">
               {education.map((e, i) => (
                 <div key={i} className="grid gap-2 sm:grid-cols-[1fr_1fr_1fr_90px_auto]">
                   <Input
-                    placeholder="Degree"
+                    placeholder={t("onboard.degree")}
                     value={e.degree ?? ""}
                     onChange={(v) =>
                       setEducation(
@@ -278,7 +267,7 @@ function Onboarding() {
                     }
                   />
                   <Input
-                    placeholder="Subject"
+                    placeholder={t("onboard.subject")}
                     value={e.subject ?? ""}
                     onChange={(v) =>
                       setEducation(
@@ -287,7 +276,7 @@ function Onboarding() {
                     }
                   />
                   <Input
-                    placeholder="Institution"
+                    placeholder={t("onboard.institution")}
                     value={e.institution ?? ""}
                     onChange={(v) =>
                       setEducation(
@@ -299,7 +288,7 @@ function Onboarding() {
                   />
                   <Input
                     type="number"
-                    placeholder="Year"
+                    placeholder={t("onboard.year")}
                     value={e.graduation_year ?? ""}
                     onChange={(v) =>
                       setEducation(
@@ -328,28 +317,29 @@ function Onboarding() {
             </div>
           </Panel>
 
-          <Panel title="Experience" icon={<BriefcaseBusiness className="h-4 w-4 text-primary" />}>
+          <Panel
+            title={t("onboard.experience")}
+            icon={<BriefcaseBusiness className="h-4 w-4 text-primary" />}
+          >
             <div className="mb-3 flex items-center justify-between">
-              <Label>Optional, but improves matching</Label>
+              <Label>{t("onboard.experienceOptional")}</Label>
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 onClick={() => setExperience([...experience, {}])}
               >
-                <Plus className="h-3 w-3" /> Add
+                <Plus className="h-3 w-3" /> {t("onboard.add")}
               </Button>
             </div>
             {experience.length === 0 && (
-              <p className="text-xs text-muted-foreground">
-                None detected. You can continue without experience.
-              </p>
+              <p className="text-xs text-muted-foreground">{t("onboard.experienceEmpty")}</p>
             )}
             <div className="space-y-2">
               {experience.map((e, i) => (
                 <div key={i} className="grid gap-2 sm:grid-cols-[1fr_1fr_90px_auto]">
                   <Input
-                    placeholder="Title"
+                    placeholder={t("onboard.jobTitle")}
                     value={e.title ?? ""}
                     onChange={(v) =>
                       setExperience(
@@ -358,7 +348,7 @@ function Onboarding() {
                     }
                   />
                   <Input
-                    placeholder="Company"
+                    placeholder={t("onboard.company")}
                     value={e.company ?? ""}
                     onChange={(v) =>
                       setExperience(
@@ -369,7 +359,7 @@ function Onboarding() {
                   <Input
                     type="number"
                     step="0.5"
-                    placeholder="Years"
+                    placeholder={t("onboard.years")}
                     value={e.years ?? ""}
                     onChange={(v) =>
                       setExperience(
@@ -396,16 +386,14 @@ function Onboarding() {
           </Panel>
 
           <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-xs text-muted-foreground">
-              Step 4 happens automatically. We will score every job for you.
-            </p>
+            <p className="text-xs text-muted-foreground">{t("onboard.step4Hint")}</p>
             <Button size="lg" onClick={handleFindJobs} disabled={finish.isPending}>
               {finish.isPending ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <Sparkles className="h-4 w-4" />
               )}
-              Find my jobs
+              {t("onboard.findMyJobs")}
             </Button>
           </div>
         </div>
@@ -436,12 +424,12 @@ function Panel({ title, icon, children }: { title: string; icon: ReactNode; chil
   );
 }
 
-function Stepper({ step }: { step: number }) {
+function Stepper({ step, t }: { step: number; t: ReturnType<typeof useT> }) {
   const items = [
-    { n: 1, label: "Upload" },
-    { n: 2, label: "Parse" },
-    { n: 3, label: "Review" },
-    { n: 4, label: "Match" },
+    { n: 1, label: t("onboard.step.upload") },
+    { n: 2, label: t("onboard.step.parse") },
+    { n: 3, label: t("onboard.step.review") },
+    { n: 4, label: t("onboard.step.match") },
   ];
   return (
     <ol className="flex flex-wrap items-center gap-2 rounded-2xl border bg-card p-3 text-xs shadow-sm">

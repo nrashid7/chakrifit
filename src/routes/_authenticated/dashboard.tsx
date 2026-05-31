@@ -24,6 +24,7 @@ import {
   SearchCheck,
   Sparkles,
 } from "lucide-react";
+import { eligibilityLabel, useT } from "@/i18n";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({ meta: [{ title: "Your matches | ChakriFit" }] }),
@@ -49,6 +50,7 @@ type MatchRow = {
 type RequirementsStatus = "parsed" | "partial" | "unknown";
 
 function Dashboard() {
+  const t = useT();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const profileFn = useServerFn(getMyProfile);
@@ -86,7 +88,7 @@ function Dashboard() {
   const compute = useMutation({
     mutationFn: () => computeFn(),
     onSuccess: () => {
-      toast.success("Matches refreshed");
+      toast.success(t("dash.matchesRefreshed"));
       qc.invalidateQueries({ queryKey: ["matches"] });
     },
     onError: (e: Error) => toast.error(e.message),
@@ -95,8 +97,8 @@ function Dashboard() {
     mutationFn: () => crawlFn({ data: { limit: 8 } }),
     onMutate: () => qc.invalidateQueries({ queryKey: ["latest-crawl-run"] }),
     onSuccess: (r) => {
-      if (r.status === "cancelled") toast.info("Crawl cancelled");
-      else toast.success(`Saved or updated ${r.succeeded} jobs`);
+      if (r.status === "cancelled") toast.info(t("dash.crawlCancelled"));
+      else toast.success(t("dash.jobsSaved", { count: r.succeeded }));
       qc.invalidateQueries({ queryKey: ["jobs"] });
       qc.invalidateQueries({ queryKey: ["matches"] });
       qc.invalidateQueries({ queryKey: ["latest-crawl-run"] });
@@ -117,7 +119,7 @@ function Dashboard() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  if (profile.isLoading) return <DashboardSkeleton />;
+  if (profile.isLoading) return <DashboardSkeleton t={t} />;
   if (!profile.data?.profile) return null;
 
   const all = (matches.data?.matches ?? []) as MatchRow[];
@@ -132,13 +134,13 @@ function Dashboard() {
           <div>
             <Badge variant="secondary" className="gap-2 rounded-full">
               <SearchCheck className="h-3.5 w-3.5 text-primary" />
-              Resume-based eligibility
+              {t("dash.badge")}
             </Badge>
-            <h1 className="mt-3 text-3xl font-bold">Your government job matches</h1>
+            <h1 className="mt-3 text-3xl font-bold">{t("dash.title")}</h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
               {all.length
-                ? `${all.length} circulars scored against your education, age, experience, and skills.`
-                : "No scores yet. Refresh matches or update your profile to start."}
+                ? t("dash.subtitleScored", { count: all.length })
+                : t("dash.subtitleEmpty")}
             </p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
@@ -154,7 +156,7 @@ function Dashboard() {
                   ) : (
                     <RefreshCw className="h-4 w-4" />
                   )}
-                  Fetch circulars
+                  {t("dash.fetchCirculars")}
                 </Button>
                 {isRunning && runRow && (
                   <Button
@@ -162,7 +164,7 @@ function Dashboard() {
                     onClick={() => cancel.mutate(runRow.id)}
                     disabled={cancel.isPending}
                   >
-                    Cancel
+                    {t("common.cancel")}
                   </Button>
                 )}
               </>
@@ -173,15 +175,15 @@ function Dashboard() {
               ) : (
                 <Sparkles className="h-4 w-4" />
               )}
-              Recompute
+              {t("dash.recompute")}
             </Button>
           </div>
         </div>
         <div className="mt-6 grid gap-3 sm:grid-cols-4">
-          <Metric label="Total scored" value={all.length} />
-          <Metric label="Eligible" value={eligible.length} tone="success" />
-          <Metric label="Partial" value={partial.length} tone="warning" />
-          <Metric label="Best score" value={`${bestScore}%`} />
+          <Metric label={t("dash.totalScored")} value={all.length} />
+          <Metric label={t("dash.eligible")} value={eligible.length} tone="success" />
+          <Metric label={t("dash.partial")} value={partial.length} tone="warning" />
+          <Metric label={t("dash.bestScore")} value={`${bestScore}%`} />
         </div>
       </section>
 
@@ -189,6 +191,7 @@ function Dashboard() {
 
       {all.length === 0 ? (
         <EmptyMatches
+          t={t}
           isAdmin={isAdmin}
           crawlPending={crawl.isPending}
           computePending={compute.isPending}
@@ -201,27 +204,29 @@ function Dashboard() {
       ) : (
         <div className="space-y-8">
           <Section
-            title="Top eligible matches"
+            title={t("dash.topEligible")}
             items={eligible.slice(0, 3)}
             tone="success"
             toggleFn={toggleFn}
             explainFn={explainFn}
             qc={qc}
+            t={t}
           />
           <Section
-            title="Worth reviewing"
+            title={t("dash.worthReviewing")}
             items={partial.slice(0, 3)}
             tone="warning"
             toggleFn={toggleFn}
             explainFn={explainFn}
             qc={qc}
+            t={t}
           />
           <div className="flex flex-wrap justify-center gap-2 pt-2">
             <Link to="/jobs">
-              <Button>Browse all jobs</Button>
+              <Button>{t("dash.browseAll")}</Button>
             </Link>
             <Link to="/onboarding">
-              <Button variant="outline">Update profile</Button>
+              <Button variant="outline">{t("dash.updateProfile")}</Button>
             </Link>
           </div>
         </div>
@@ -230,11 +235,11 @@ function Dashboard() {
   );
 }
 
-function DashboardSkeleton() {
+function DashboardSkeleton({ t }: { t: ReturnType<typeof useT> }) {
   return (
     <div className="rounded-2xl border bg-card p-8 text-center text-muted-foreground">
       <Loader2 className="mx-auto h-5 w-5 animate-spin text-primary" />
-      <p className="mt-3">Loading your profile and matches...</p>
+      <p className="mt-3">{t("dash.loadingProfile")}</p>
     </div>
   );
 }
@@ -263,12 +268,14 @@ function Metric({
 }
 
 function EmptyMatches({
+  t,
   isAdmin,
   crawlPending,
   computePending,
   onCrawlAndCompute,
   onCompute,
 }: {
+  t: ReturnType<typeof useT>;
   isAdmin: boolean;
   crawlPending: boolean;
   computePending: boolean;
@@ -278,11 +285,9 @@ function EmptyMatches({
   return (
     <div className="rounded-2xl border bg-card p-8 text-center shadow-sm">
       <FileWarning className="mx-auto h-9 w-9 text-primary" />
-      <h2 className="mt-4 text-xl font-bold">No matches yet</h2>
+      <h2 className="mt-4 text-xl font-bold">{t("dash.noMatches")}</h2>
       <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
-        {isAdmin
-          ? "Fetch the latest circulars, recompute matches, or update your profile."
-          : "Update your profile or recompute matches after new circulars are added."}
+        {isAdmin ? t("dash.noMatchesAdmin") : t("dash.noMatchesUser")}
       </p>
       <div className="mt-6 flex flex-col justify-center gap-2 sm:flex-row">
         {isAdmin && (
@@ -292,7 +297,7 @@ function EmptyMatches({
             ) : (
               <RefreshCw className="h-4 w-4" />
             )}
-            Fetch and score jobs
+            {t("dash.fetchAndScore")}
           </Button>
         )}
         <Button variant="outline" onClick={onCompute} disabled={computePending}>
@@ -301,10 +306,10 @@ function EmptyMatches({
           ) : (
             <Sparkles className="h-4 w-4" />
           )}
-          Recompute matches
+          {t("dash.recomputeMatches")}
         </Button>
         <Link to="/onboarding">
-          <Button variant="outline">Update profile</Button>
+          <Button variant="outline">{t("dash.updateProfile")}</Button>
         </Link>
       </div>
     </div>
@@ -318,6 +323,7 @@ function Section({
   toggleFn,
   explainFn,
   qc,
+  t,
 }: {
   title: string;
   items: MatchRow[];
@@ -325,6 +331,7 @@ function Section({
   toggleFn: ReturnType<typeof useServerFn<typeof toggleSave>>;
   explainFn: ReturnType<typeof useServerFn<typeof explainMatch>>;
   qc: ReturnType<typeof useQueryClient>;
+  t: ReturnType<typeof useT>;
 }) {
   if (items.length === 0) return null;
   return (
@@ -343,6 +350,7 @@ function Section({
             toggleFn={toggleFn}
             explainFn={explainFn}
             qc={qc}
+            t={t}
           />
         ))}
       </div>
@@ -356,12 +364,14 @@ function MatchCard({
   toggleFn,
   explainFn,
   qc,
+  t,
 }: {
   m: MatchRow;
   tone: "success" | "warning" | "muted";
   toggleFn: ReturnType<typeof useServerFn<typeof toggleSave>>;
   explainFn: ReturnType<typeof useServerFn<typeof explainMatch>>;
   qc: ReturnType<typeof useQueryClient>;
+  t: ReturnType<typeof useT>;
 }) {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState<string | null>(m.explanation);
@@ -384,7 +394,7 @@ function MatchCard({
   async function handleSave() {
     try {
       const r = await toggleFn({ data: { jobId: m.job.id } });
-      toast.success(r.saved ? "Saved" : "Removed from saved");
+      toast.success(r.saved ? t("common.saved") : t("dash.removedFromSaved"));
       qc.invalidateQueries({ queryKey: ["saved"] });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed");
@@ -397,7 +407,7 @@ function MatchCard({
       : tone === "warning"
         ? "text-warning-foreground"
         : "text-muted-foreground";
-  const statusLabel = m.eligibility_status.replace("_", " ");
+  const statusLabel = eligibilityLabel(m.eligibility_status, t);
 
   return (
     <>
@@ -415,7 +425,7 @@ function MatchCard({
                 </Badge>
               )}
               {m.job.salary && <Badge variant="outline">{m.job.salary}</Badge>}
-              <RequirementsBadge status={getRequirementsStatus(m.job.parsed_json)} />
+              <RequirementsBadge status={getRequirementsStatus(m.job.parsed_json)} t={t} />
             </div>
             <Link
               to="/jobs/$jobId"
@@ -428,28 +438,33 @@ function MatchCard({
               <ArrowRight className="h-4 w-4 shrink-0 text-primary" />
             </Link>
             <p className="mt-1 truncate text-sm text-muted-foreground">
-              {m.job.organization ?? "Bangladesh government"}
+              {m.job.organization ?? t("common.bangladeshGov")}
             </p>
           </div>
           <div className="flex items-center justify-between gap-3 lg:flex-col lg:items-end">
             <div className={`text-4xl font-bold tabular-nums ${toneClass}`}>{m.score}%</div>
             <div className="flex flex-wrap justify-end gap-2">
               <Button size="sm" onClick={loadExplain}>
-                Why
+                {t("common.why")}
               </Button>
               <Link to="/jobs/$jobId" params={{ jobId: m.job.id }}>
                 <Button size="sm" variant="outline">
-                  Details
+                  {t("common.details")}
                 </Button>
               </Link>
               {m.job.circular_url && (
                 <a href={m.job.circular_url} target="_blank" rel="noreferrer">
-                  <Button size="icon" variant="outline" aria-label="Open official circular">
+                  <Button size="icon" variant="outline" aria-label={t("job.officialCircular")}>
                     <ExternalLink className="h-4 w-4" />
                   </Button>
                 </a>
               )}
-              <Button size="icon" variant="ghost" onClick={handleSave} aria-label="Save job">
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={handleSave}
+                aria-label={t("job.saveJob")}
+              >
                 <BookmarkPlus className="h-4 w-4" />
               </Button>
             </div>
@@ -482,10 +497,16 @@ function getRequirementsStatus(value: unknown): RequirementsStatus {
   return status === "parsed" || status === "partial" || status === "unknown" ? status : "unknown";
 }
 
-function RequirementsBadge({ status }: { status: RequirementsStatus }) {
-  if (status === "parsed") return <Badge variant="secondary">Parsed requirements</Badge>;
-  if (status === "partial") return <Badge variant="outline">Partial requirements</Badge>;
-  return <Badge variant="outline">Verify circular</Badge>;
+function RequirementsBadge({
+  status,
+  t,
+}: {
+  status: RequirementsStatus;
+  t: ReturnType<typeof useT>;
+}) {
+  if (status === "parsed") return <Badge variant="secondary">{t("req.parsed")}</Badge>;
+  if (status === "partial") return <Badge variant="outline">{t("req.partial")}</Badge>;
+  return <Badge variant="outline">{t("req.verify")}</Badge>;
 }
 
 type CrawlStatus = "queued" | "running" | "completed" | "cancelled" | "failed";

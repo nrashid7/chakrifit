@@ -9,6 +9,7 @@ import { toggleSave, listSaved } from "@/lib/saved.functions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { useT, eligibilityLabel } from "@/i18n";
 import {
   ArrowLeft,
   BookmarkCheck,
@@ -23,8 +24,6 @@ import {
   ShieldCheck,
   Timer,
 } from "lucide-react";
-
-const UNKNOWN_REQUIREMENTS_LABEL = "Not parsed yet - verify official circular";
 
 type RequirementsStatus = "parsed" | "partial" | "unknown";
 
@@ -57,6 +56,7 @@ export const Route = createFileRoute("/_authenticated/jobs/$jobId")({
 
 function JobDetail() {
   const { jobId } = useParams({ from: "/_authenticated/jobs/$jobId" });
+  const t = useT();
   const qc = useQueryClient();
   const jobFn = useServerFn(getJob);
   const matchesFn = useServerFn(listMatches);
@@ -73,7 +73,7 @@ function JobDetail() {
   const reparse = useMutation({
     mutationFn: () => reparseFn({ data: { jobId } }),
     onSuccess: () => {
-      toast.success("Re-parsed successfully");
+      toast.success(t("job.reparseSuccess"));
       qc.invalidateQueries({ queryKey: ["job", jobId] });
       qc.invalidateQueries({ queryKey: ["jobs"] });
       qc.invalidateQueries({ queryKey: ["matches"] });
@@ -81,8 +81,9 @@ function JobDetail() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  if (job.isLoading) return <p className="py-12 text-center text-muted-foreground">Loading...</p>;
-  if (!job.data?.job) return <p className="py-12 text-center">Job not found.</p>;
+  if (job.isLoading)
+    return <p className="py-12 text-center text-muted-foreground">{t("common.loading")}</p>;
+  if (!job.data?.job) return <p className="py-12 text-center">{t("common.jobNotFound")}</p>;
 
   const j = job.data.job as JobDetailRow;
   const llm = getLlm(j.parsed_json);
@@ -101,41 +102,47 @@ function JobDetail() {
   const requiredDegrees = j.education_requirements?.required_degrees ?? [];
   const requiredSubjects = j.education_requirements?.required_subjects ?? [];
   const preferredSkills = j.experience_requirements?.preferred_skills ?? [];
-  const minimumGpa = textValue(llm.minimum_gpa_or_class);
-  const educationNotes = textValue(llm.education_notes);
-  const experienceNotes = textValue(llm.experience_notes);
-  const salaryOrGrade = j.salary ?? textValue(llm.grade) ?? textValue(llm.salary_scale);
-  const applicationUrl = textValue(llm.application_url);
+  const minimumGpa = stringValue(llm.minimum_gpa_or_class);
+  const educationNotes = stringValue(llm.education_notes);
+  const experienceNotes = stringValue(llm.experience_notes);
+  const salaryOrGrade = j.salary ?? stringValue(llm.grade) ?? stringValue(llm.salary_scale);
+  const applicationUrl = stringValue(llm.application_url);
   const documentsRequired = stringList(llm.documents_required);
   const specialConditions = stringList(llm.special_conditions);
 
   const hasEducation =
     requiredDegrees.length > 0 ||
     requiredSubjects.length > 0 ||
-    valueExists(minimumGpa) ||
-    valueExists(educationNotes);
-  const hasSkillsExperience = preferredSkills.length > 0 || valueExists(experienceNotes);
+    hasAny(minimumGpa) ||
+    hasAny(educationNotes);
+  const hasSkillsExperience = preferredSkills.length > 0 || hasAny(experienceNotes);
   const hasApplicationDetails =
-    valueExists(llm.application_fee) ||
-    valueExists(llm.application_start) ||
-    valueExists(llm.application_deadline) ||
-    valueExists(applicationUrl);
+    hasAny(llm.application_fee) ||
+    hasAny(llm.application_start) ||
+    hasAny(llm.application_deadline) ||
+    hasAny(applicationUrl);
   const hasAgeQuota =
-    valueExists(llm.age_cutoff_date) ||
-    valueExists(llm.age_relaxation) ||
-    valueExists(llm.quota_info) ||
-    valueExists(llm.district_restrictions) ||
-    valueExists(llm.gender_restrictions);
+    hasAny(llm.age_cutoff_date) ||
+    hasAny(llm.age_relaxation) ||
+    hasAny(llm.quota_info) ||
+    hasAny(llm.district_restrictions) ||
+    hasAny(llm.gender_restrictions);
   const hasSelectionDocuments =
-    valueExists(llm.selection_process) ||
-    documentsRequired.length > 0 ||
-    specialConditions.length > 0;
+    hasAny(llm.selection_process) || documentsRequired.length > 0 || specialConditions.length > 0;
 
   async function handleSave() {
     const r = await toggleFn({ data: { jobId } });
-    toast.success(r.saved ? "Saved" : "Removed");
+    toast.success(r.saved ? t("common.saved") : t("common.removed"));
     qc.invalidateQueries({ queryKey: ["saved"] });
   }
+
+  const ageText =
+    j.age_limit?.max_age || j.age_limit?.min_age
+      ? t("job.yearsMin", {
+          min: String(j.age_limit?.min_age ?? t("job.anyAge")),
+          max: String(j.age_limit?.max_age ?? t("job.anyAge")),
+        })
+      : requirementFallback(requirementsStatus, t);
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -143,7 +150,7 @@ function JobDetail() {
         to="/dashboard"
         className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
       >
-        <ArrowLeft className="mr-1 h-3 w-3" /> Back to dashboard
+        <ArrowLeft className="mr-1 h-3 w-3" /> {t("common.backToDashboard")}
       </Link>
 
       <section className="rounded-2xl border bg-card p-6 shadow-sm">
@@ -151,28 +158,32 @@ function JobDetail() {
           <div className="min-w-0">
             <div className="flex flex-wrap gap-2">
               {myMatch && (
-                <Badge className="capitalize">{myMatch.eligibility_status.replace("_", " ")}</Badge>
+                <Badge className="capitalize">
+                  {eligibilityLabel(myMatch.eligibility_status, t)}
+                </Badge>
               )}
               {j.deadline && (
                 <Badge variant="secondary">
                   <CalendarClock className="h-3 w-3" />
-                  Deadline {j.deadline}
+                  {t("common.deadline")} {j.deadline}
                 </Badge>
               )}
               {j.salary && <Badge variant="outline">{j.salary}</Badge>}
-              <RequirementsBadge status={requirementsStatus} />
+              <RequirementsBadge status={requirementsStatus} t={t} />
             </div>
             <h1 className="mt-4 text-3xl font-bold leading-tight">{j.title}</h1>
             <p className="mt-2 text-muted-foreground">
-              {j.organization ?? "Bangladesh government"}
+              {j.organization ?? t("common.bangladeshGov")}
             </p>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
-              {statusNote(requirementsStatus)}
+              {statusNote(requirementsStatus, t)}
             </p>
           </div>
           {myMatch && (
             <div className="rounded-xl border bg-background p-4 text-center">
-              <p className="text-xs font-medium uppercase text-muted-foreground">Your score</p>
+              <p className="text-xs font-medium uppercase text-muted-foreground">
+                {t("common.yourScore")}
+              </p>
               <div
                 className={`mt-2 text-5xl font-bold tabular-nums ${myMatch.eligibility_status === "eligible" ? "text-success" : myMatch.eligibility_status === "partial" ? "text-warning-foreground" : "text-muted-foreground"}`}
               >
@@ -185,13 +196,13 @@ function JobDetail() {
           {j.circular_url && (
             <a href={j.circular_url} target="_blank" rel="noreferrer">
               <Button className="w-full sm:w-auto">
-                <ExternalLink className="h-4 w-4" /> Official circular
+                <ExternalLink className="h-4 w-4" /> {t("job.officialCircular")}
               </Button>
             </a>
           )}
           <Button variant="outline" onClick={handleSave} className="w-full sm:w-auto">
             {isSaved ? <BookmarkCheck className="h-4 w-4" /> : <BookmarkPlus className="h-4 w-4" />}
-            {isSaved ? "Saved" : "Save job"}
+            {isSaved ? t("common.saved") : t("job.saveJob")}
           </Button>
           {admin.data?.isAdmin && (
             <Button
@@ -205,43 +216,46 @@ function JobDetail() {
               ) : (
                 <RefreshCw className="h-4 w-4" />
               )}
-              Re-parse PDF
+              {t("job.reparsePdf")}
             </Button>
           )}
         </div>
       </section>
 
       <div className="grid gap-4 md:grid-cols-3">
-        <Field icon={<Timer className="h-4 w-4 text-primary" />} label="Age requirement">
-          {j.age_limit?.max_age || j.age_limit?.min_age
-            ? `${j.age_limit?.min_age ?? "Any"} to ${j.age_limit?.max_age ?? "Any"} years`
-            : requirementFallback(requirementsStatus)}
+        <Field icon={<Timer className="h-4 w-4 text-primary" />} label={t("job.ageRequirement")}>
+          {ageText}
         </Field>
-        <Field icon={<BriefcaseBusiness className="h-4 w-4 text-primary" />} label="Experience">
+        <Field
+          icon={<BriefcaseBusiness className="h-4 w-4 text-primary" />}
+          label={t("job.experience")}
+        >
           {j.experience_requirements?.min_experience_years != null
-            ? `${j.experience_requirements.min_experience_years} year(s) minimum`
-            : requirementFallback(requirementsStatus)}
+            ? t("job.yearsMinimum", {
+                years: String(j.experience_requirements.min_experience_years),
+              })
+            : requirementFallback(requirementsStatus, t)}
         </Field>
-        <Field icon={<ShieldCheck className="h-4 w-4 text-primary" />} label="Salary / Grade">
-          {salaryOrGrade ?? requirementFallback(requirementsStatus)}
+        <Field icon={<ShieldCheck className="h-4 w-4 text-primary" />} label={t("job.salaryGrade")}>
+          {salaryOrGrade ?? requirementFallback(requirementsStatus, t)}
         </Field>
       </div>
 
       {(hasEducation || requirementsStatus !== "parsed") && (
         <SectionCard
           icon={<GraduationCap className="h-4 w-4 text-primary" />}
-          title="Education Requirements"
+          title={t("job.educationRequirements")}
         >
           {hasEducation ? (
             <div className="space-y-4">
-              <BadgeList label="Required degrees" items={requiredDegrees} />
-              <BadgeList label="Required subjects" items={requiredSubjects} />
-              <DetailLine label="Minimum GPA/class" value={minimumGpa} />
-              <DetailLine label="Education notes" value={educationNotes} />
+              <BadgeList label={t("job.requiredDegrees")} items={requiredDegrees} />
+              <BadgeList label={t("job.requiredSubjects")} items={requiredSubjects} />
+              <DetailLine label={t("job.minimumGpa")} value={minimumGpa} />
+              <DetailLine label={t("job.educationNotes")} value={educationNotes} />
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">
-              {requirementFallback(requirementsStatus)}
+              {requirementFallback(requirementsStatus, t)}
             </p>
           )}
         </SectionCard>
@@ -250,11 +264,11 @@ function JobDetail() {
       {hasSkillsExperience && (
         <SectionCard
           icon={<BriefcaseBusiness className="h-4 w-4 text-primary" />}
-          title="Skills & Experience"
+          title={t("job.skillsExperience")}
         >
           <div className="space-y-4">
-            <BadgeList label="Preferred skills" items={preferredSkills} />
-            <DetailLine label="Experience notes" value={experienceNotes} />
+            <BadgeList label={t("job.preferredSkills")} items={preferredSkills} />
+            <DetailLine label={t("job.experienceNotes")} value={experienceNotes} />
           </div>
         </SectionCard>
       )}
@@ -262,16 +276,22 @@ function JobDetail() {
       {hasApplicationDetails && (
         <SectionCard
           icon={<ExternalLink className="h-4 w-4 text-primary" />}
-          title="Application Details"
+          title={t("job.applicationDetails")}
         >
           <div className="grid gap-3 sm:grid-cols-2">
-            <DetailLine label="Application fee" value={textValue(llm.application_fee)} />
-            <DetailLine label="Application opens" value={textValue(llm.application_start)} />
-            <DetailLine label="Application deadline" value={textValue(llm.application_deadline)} />
+            <DetailLine label={t("job.applicationFee")} value={stringValue(llm.application_fee)} />
+            <DetailLine
+              label={t("job.applicationOpens")}
+              value={stringValue(llm.application_start)}
+            />
+            <DetailLine
+              label={t("job.applicationDeadline")}
+              value={stringValue(llm.application_deadline)}
+            />
             {applicationUrl && (
               <div>
                 <p className="text-xs font-semibold uppercase text-muted-foreground">
-                  Apply online
+                  {t("job.applyOnline")}
                 </p>
                 <a
                   href={applicationUrl}
@@ -279,7 +299,7 @@ function JobDetail() {
                   rel="noreferrer"
                   className="mt-1 inline-flex items-center gap-1 text-sm text-primary hover:underline"
                 >
-                  Open application site <ExternalLink className="h-3 w-3" />
+                  {t("job.openApplicationSite")} <ExternalLink className="h-3 w-3" />
                 </a>
               </div>
             )}
@@ -288,16 +308,22 @@ function JobDetail() {
       )}
 
       {hasAgeQuota && (
-        <SectionCard icon={<Timer className="h-4 w-4 text-primary" />} title="Age & Quota Details">
+        <SectionCard
+          icon={<Timer className="h-4 w-4 text-primary" />}
+          title={t("job.ageQuotaDetails")}
+        >
           <div className="grid gap-3 sm:grid-cols-2">
-            <DetailLine label="Age cutoff date" value={textValue(llm.age_cutoff_date)} />
-            <DetailLine label="Age relaxation" value={textValue(llm.age_relaxation)} />
-            <DetailLine label="Quota info" value={textValue(llm.quota_info)} />
+            <DetailLine label={t("job.ageCutoffDate")} value={stringValue(llm.age_cutoff_date)} />
+            <DetailLine label={t("job.ageRelaxation")} value={stringValue(llm.age_relaxation)} />
+            <DetailLine label={t("job.quotaInfo")} value={stringValue(llm.quota_info)} />
             <DetailLine
-              label="District restrictions"
-              value={textValue(llm.district_restrictions)}
+              label={t("job.districtRestrictions")}
+              value={stringValue(llm.district_restrictions)}
             />
-            <DetailLine label="Gender restrictions" value={textValue(llm.gender_restrictions)} />
+            <DetailLine
+              label={t("job.genderRestrictions")}
+              value={stringValue(llm.gender_restrictions)}
+            />
           </div>
         </SectionCard>
       )}
@@ -305,12 +331,15 @@ function JobDetail() {
       {hasSelectionDocuments && (
         <SectionCard
           icon={<FileText className="h-4 w-4 text-primary" />}
-          title="Selection & Documents"
+          title={t("job.selectionDocuments")}
         >
           <div className="space-y-4">
-            <DetailLine label="Selection process" value={textValue(llm.selection_process)} />
-            <ListBlock label="Documents required" items={documentsRequired} />
-            <ListBlock label="Special conditions" items={specialConditions} />
+            <DetailLine
+              label={t("job.selectionProcess")}
+              value={stringValue(llm.selection_process)}
+            />
+            <ListBlock label={t("job.documentsRequired")} items={documentsRequired} />
+            <ListBlock label={t("job.specialConditions")} items={specialConditions} />
           </div>
         </SectionCard>
       )}
@@ -318,7 +347,7 @@ function JobDetail() {
       {j.description && (
         <SectionCard
           icon={<ShieldCheck className="h-4 w-4 text-primary" />}
-          title="Circular Summary"
+          title={t("job.circularSummary")}
         >
           <p className="whitespace-pre-wrap leading-relaxed">{j.description}</p>
         </SectionCard>
@@ -327,7 +356,9 @@ function JobDetail() {
       {myMatch && (
         <section className="rounded-2xl border bg-card p-6 shadow-sm">
           <h2 className="font-semibold">
-            Why this {myMatch.eligibility_status.replace("_", " ")} match?
+            {t("job.matchExplanation", {
+              status: eligibilityLabel(myMatch.eligibility_status, t).toLowerCase(),
+            })}
           </h2>
           {myMatch.explanation ? (
             <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
@@ -336,10 +367,18 @@ function JobDetail() {
           ) : (
             <div className="mt-4 grid gap-4 text-sm sm:grid-cols-2">
               {myMatch.reasons?.positives?.length ? (
-                <ReasonList title="Strengths" tone="success" items={myMatch.reasons.positives} />
+                <ReasonList
+                  title={t("job.strengths")}
+                  tone="success"
+                  items={myMatch.reasons.positives}
+                />
               ) : null}
               {myMatch.reasons?.negatives?.length ? (
-                <ReasonList title="Gaps" tone="destructive" items={myMatch.reasons.negatives} />
+                <ReasonList
+                  title={t("job.gaps")}
+                  tone="destructive"
+                  items={myMatch.reasons.negatives}
+                />
               ) : null}
             </div>
           )}
@@ -357,9 +396,11 @@ function getLlm(parsedJson: unknown): Record<string, unknown> {
     : {};
 }
 
-function valueExists(value: unknown) {
-  if (Array.isArray(value)) return value.length > 0;
-  return typeof value === "string" ? value.trim().length > 0 : value != null;
+function hasAny(...values: unknown[]) {
+  return values.some((value) => {
+    if (Array.isArray(value)) return value.length > 0;
+    return typeof value === "string" ? value.trim().length > 0 : value != null;
+  });
 }
 
 function stringList(value: unknown): string[] {
@@ -368,7 +409,7 @@ function stringList(value: unknown): string[] {
     : [];
 }
 
-function textValue(value: unknown): string | null {
+function stringValue(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
@@ -378,22 +419,26 @@ function getRequirementsStatus(value: unknown): RequirementsStatus {
   return status === "parsed" || status === "partial" || status === "unknown" ? status : "unknown";
 }
 
-function requirementFallback(status: RequirementsStatus) {
-  return status === "unknown" ? UNKNOWN_REQUIREMENTS_LABEL : "Not specified";
+function requirementFallback(status: RequirementsStatus, t: ReturnType<typeof useT>) {
+  return status === "unknown" ? t("req.unknownLabel") : t("common.notSpecified");
 }
 
-function statusNote(status: RequirementsStatus) {
-  if (status === "parsed") return "Requirements parsed from the official circular.";
-  if (status === "partial") {
-    return "Some requirements were parsed. Please verify the official circular before applying.";
-  }
-  return "ChakriFit could not parse this circular yet. Please verify manually.";
+function statusNote(status: RequirementsStatus, t: ReturnType<typeof useT>) {
+  if (status === "parsed") return t("req.note.parsed");
+  if (status === "partial") return t("req.note.partial");
+  return t("req.note.unknown");
 }
 
-function RequirementsBadge({ status }: { status: RequirementsStatus }) {
-  if (status === "parsed") return <Badge variant="secondary">Parsed requirements</Badge>;
-  if (status === "partial") return <Badge variant="outline">Partial requirements</Badge>;
-  return <Badge variant="outline">Verify circular</Badge>;
+function RequirementsBadge({
+  status,
+  t,
+}: {
+  status: RequirementsStatus;
+  t: ReturnType<typeof useT>;
+}) {
+  if (status === "parsed") return <Badge variant="secondary">{t("req.parsed")}</Badge>;
+  if (status === "partial") return <Badge variant="outline">{t("req.partial")}</Badge>;
+  return <Badge variant="outline">{t("req.verify")}</Badge>;
 }
 
 function Field({ label, icon, children }: { label: string; icon: ReactNode; children: ReactNode }) {

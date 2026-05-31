@@ -20,6 +20,8 @@ import {
   Upload,
   type LucideIcon,
 } from "lucide-react";
+import { useT } from "@/i18n";
+import type { TranslationKey } from "@/i18n/dictionaries/en";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -35,34 +37,17 @@ export const Route = createFileRoute("/")({
   component: Landing,
 });
 
-const faqs = [
-  {
-    q: "Is ChakriFit affiliated with the government or Teletalk?",
-    a: "No. ChakriFit is independent. We read publicly available circulars and do not submit applications or influence recruitment.",
-  },
-  {
-    q: "What does it cost?",
-    a: "ChakriFit is free during MVP. If paid features are added later, core matching will stay free.",
-  },
-  {
-    q: "How accurate is the eligibility score?",
-    a: "It is a best-effort estimate using rules for age, degree, subject, experience, and skills plus AI parsing. Always verify the official circular before applying.",
-  },
-  {
-    q: "What happens to my resume?",
-    a: "Your resume is stored privately with row-level security. We extract structured fields for matching, and you can delete the file or your account from Settings.",
-  },
-  {
-    q: "Do you support Bangla resumes?",
-    a: "Yes. The AI parser handles English, Bangla, and mixed-language resumes.",
-  },
-  {
-    q: "How often is the job list updated?",
-    a: "The crawler is designed to refresh Teletalk circulars daily. Admins can also trigger a manual refresh.",
-  },
+const faqKeys: Array<{ q: TranslationKey; a: TranslationKey }> = [
+  { q: "faq.q1", a: "faq.a1" },
+  { q: "faq.q2", a: "faq.a2" },
+  { q: "faq.q3", a: "faq.a3" },
+  { q: "faq.q4", a: "faq.a4" },
+  { q: "faq.q5", a: "faq.a5" },
+  { q: "faq.q6", a: "faq.a6" },
 ];
 
 function Landing() {
+  const t = useT();
   return (
     <div className="min-h-screen">
       <SiteHeader
@@ -70,11 +55,11 @@ function Landing() {
           <>
             <Link to="/login">
               <Button variant="ghost" size="sm">
-                Log in
+                {t("nav.logIn")}
               </Button>
             </Link>
             <Link to="/login">
-              <Button size="sm">Get started</Button>
+              <Button size="sm">{t("nav.getStarted")}</Button>
             </Link>
           </>
         }
@@ -85,33 +70,32 @@ function Landing() {
           <div>
             <Badge variant="secondary" className="gap-2 rounded-full px-3 py-1">
               <Sparkles className="h-3.5 w-3.5 text-primary" />
-              AI eligibility for Bangladesh government jobs
+              {t("landing.heroBadge")}
             </Badge>
             <h1 className="mt-6 max-w-3xl text-4xl font-bold leading-tight text-foreground sm:text-5xl lg:text-6xl">
-              Stop reading every circular. See the jobs that fit your CV.
+              {t("landing.heroTitle")}
             </h1>
             <p className="mt-5 max-w-2xl text-base leading-8 text-muted-foreground sm:text-lg">
-              ChakriFit reads your resume, compares it with government job requirements, and shows
-              clear eligibility reasons before you spend time applying.
+              {t("landing.heroSubtitle")}
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Link to="/login">
                 <Button size="lg" className="w-full gap-2 sm:w-auto">
                   <Upload className="h-4 w-4" />
-                  Upload resume
+                  {t("landing.uploadResume")}
                   <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>
               <a href="#workflow">
                 <Button size="lg" variant="outline" className="w-full sm:w-auto">
-                  See workflow
+                  {t("landing.seeWorkflow")}
                 </Button>
               </a>
             </div>
             <div className="mt-8 grid gap-3 text-sm text-muted-foreground sm:grid-cols-3">
-              <TrustItem icon={ShieldCheck} label="Independent product" />
-              <TrustItem icon={LockKeyhole} label="Private resume storage" />
-              <TrustItem icon={Clock} label="Daily crawler ready" />
+              <TrustItem icon={ShieldCheck} label={t("landing.trustIndependent")} />
+              <TrustItem icon={LockKeyhole} label={t("landing.trustPrivate")} />
+              <TrustItem icon={Clock} label={t("landing.trustCrawler")} />
             </div>
           </div>
 
@@ -120,11 +104,11 @@ function Landing() {
               <div className="flex items-center justify-between border-b pb-3">
                 <div>
                   <p className="text-xs font-medium uppercase text-muted-foreground">
-                    Your matches
+                    {t("landing.previewMatches")}
                   </p>
-                  <h2 className="text-xl font-bold">18 jobs scored</h2>
+                  <h2 className="text-xl font-bold">{t("landing.previewScored")}</h2>
                 </div>
-                <Badge className="rounded-full">Live fit view</Badge>
+                <Badge className="rounded-full">{t("landing.previewLive")}</Badge>
               </div>
               <div className="mt-4 space-y-3">
                 <PreviewMatch
@@ -156,24 +140,26 @@ function Landing() {
         <section id="workflow" className="border-y bg-card/65">
           <div className="mx-auto grid max-w-7xl gap-6 px-4 py-12 sm:px-6 lg:grid-cols-4">
             <div className="lg:col-span-1">
-              <p className="text-sm font-semibold uppercase text-primary">Workflow</p>
-              <h2 className="mt-2 text-3xl font-bold">From CV to short list in minutes.</h2>
+              <p className="text-sm font-semibold uppercase text-primary">
+                {t("landing.workflow")}
+              </p>
+              <h2 className="mt-2 text-3xl font-bold">{t("landing.workflowTitle")}</h2>
             </div>
             <div className="grid gap-4 sm:grid-cols-3 lg:col-span-3">
               <Step
                 icon={Upload}
-                title="Upload"
-                body="PDF, DOCX, or text. Resume text is extracted in the browser first."
+                title={t("landing.stepUpload")}
+                body={t("landing.stepUploadBody")}
               />
               <Step
                 icon={FileSearch}
-                title="Parse"
-                body="AI structures your degree, subject, age, experience, and skills."
+                title={t("landing.stepParse")}
+                body={t("landing.stepParseBody")}
               />
               <Step
                 icon={BookmarkCheck}
-                title="Act"
-                body="Save jobs, open the official circular, and track what you applied to."
+                title={t("landing.stepAct")}
+                body={t("landing.stepActBody")}
               />
             </div>
           </div>
@@ -181,50 +167,44 @@ function Landing() {
 
         <section className="mx-auto grid max-w-7xl gap-8 px-4 py-16 sm:px-6 lg:grid-cols-[0.9fr_1.1fr]">
           <div>
-            <p className="text-sm font-semibold uppercase text-primary">Why it feels different</p>
-            <h2 className="mt-2 text-3xl font-bold">
-              Eligibility explanations, not job-board noise.
-            </h2>
-            <p className="mt-4 leading-7 text-muted-foreground">
-              ChakriFit is designed for candidates who need confidence before applying. It does not
-              hide behind a generic score. Every result shows the requirement signals that helped or
-              hurt the match.
-            </p>
+            <p className="text-sm font-semibold uppercase text-primary">{t("landing.whyBadge")}</p>
+            <h2 className="mt-2 text-3xl font-bold">{t("landing.whyTitle")}</h2>
+            <p className="mt-4 leading-7 text-muted-foreground">{t("landing.whyBody")}</p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <Feature
               icon={CheckCircle2}
-              title="Requirement-aware"
-              body="Scores age, degree, subject, experience, and preferred skills."
+              title={t("landing.featRequirement")}
+              body={t("landing.featRequirementBody")}
             />
             <Feature
               icon={Sparkles}
-              title="Plain explanations"
-              body="AI turns structured reasons into concise, readable guidance."
+              title={t("landing.featPlain")}
+              body={t("landing.featPlainBody")}
             />
             <Feature
               icon={ShieldCheck}
-              title="Official-source focused"
-              body="Circular links stay one click away for final verification."
+              title={t("landing.featOfficial")}
+              body={t("landing.featOfficialBody")}
             />
             <Feature
               icon={LockKeyhole}
-              title="Private by default"
-              body="Resume data is scoped to the signed-in user with RLS."
+              title={t("landing.featPrivate")}
+              body={t("landing.featPrivateBody")}
             />
           </div>
         </section>
 
         <section id="faq" className="mx-auto max-w-3xl px-4 py-16 sm:px-6">
           <div className="text-center">
-            <p className="text-sm font-semibold uppercase text-primary">FAQ</p>
-            <h2 className="mt-2 text-3xl font-bold">Questions before uploading</h2>
+            <p className="text-sm font-semibold uppercase text-primary">{t("landing.faqBadge")}</p>
+            <h2 className="mt-2 text-3xl font-bold">{t("landing.faqTitle")}</h2>
           </div>
           <Accordion type="single" collapsible className="mt-8 rounded-xl border bg-card px-4">
-            {faqs.map((f, i) => (
+            {faqKeys.map((f, i) => (
               <AccordionItem key={f.q} value={`q${i}`}>
-                <AccordionTrigger className="text-left">{f.q}</AccordionTrigger>
-                <AccordionContent className="text-muted-foreground">{f.a}</AccordionContent>
+                <AccordionTrigger className="text-left">{t(f.q)}</AccordionTrigger>
+                <AccordionContent className="text-muted-foreground">{t(f.a)}</AccordionContent>
               </AccordionItem>
             ))}
           </Accordion>
@@ -234,14 +214,12 @@ function Landing() {
           <div className="rounded-2xl bg-primary p-8 text-primary-foreground sm:p-10">
             <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
               <div>
-                <h2 className="text-3xl font-bold">Build your government-job short list.</h2>
-                <p className="mt-2 max-w-2xl text-primary-foreground/80">
-                  Upload your CV once and let ChakriFit sort the circulars by fit.
-                </p>
+                <h2 className="text-3xl font-bold">{t("landing.ctaTitle")}</h2>
+                <p className="mt-2 max-w-2xl text-primary-foreground/80">{t("landing.ctaBody")}</p>
               </div>
               <Link to="/login">
                 <Button size="lg" variant="secondary" className="w-full md:w-auto">
-                  Get started free
+                  {t("landing.ctaButton")}
                 </Button>
               </Link>
             </div>

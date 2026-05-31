@@ -8,6 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { BriefcaseBusiness, LockKeyhole, Mail, ShieldCheck } from "lucide-react";
+import { LanguageToggle } from "@/components/language-toggle";
+import { useT } from "@/i18n";
 
 export const Route = createFileRoute("/login")({
   head: () => ({ meta: [{ title: "Log in | ChakriFit" }] }),
@@ -16,6 +18,7 @@ export const Route = createFileRoute("/login")({
 
 function LoginPage() {
   const navigate = useNavigate();
+  const t = useT();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -36,7 +39,7 @@ function LoginPage() {
     });
     setLoading(false);
     if (error) return toast.error(error.message);
-    toast.success("Check your email to confirm your account.");
+    toast.success(t("login.checkEmail"));
   }
 
   async function handleLogin(e: FormEvent) {
@@ -66,29 +69,28 @@ function LoginPage() {
         </Link>
         <div>
           <p className="text-sm font-semibold uppercase text-primary-foreground/70">
-            Resume to eligibility
+            {t("login.heroBadge")}
           </p>
-          <h1 className="mt-3 max-w-xl text-5xl font-bold leading-tight">
-            Sign in to see which circulars actually fit.
-          </h1>
+          <h1 className="mt-3 max-w-xl text-5xl font-bold leading-tight">{t("login.heroTitle")}</h1>
           <div className="mt-8 grid gap-3 text-sm text-primary-foreground/80">
             <span className="flex items-center gap-2">
-              <ShieldCheck className="h-4 w-4" /> Private profile and resume storage
+              <ShieldCheck className="h-4 w-4" /> {t("login.heroPrivate")}
             </span>
             <span className="flex items-center gap-2">
-              <LockKeyhole className="h-4 w-4" /> Row-level security for candidate data
+              <LockKeyhole className="h-4 w-4" /> {t("login.heroRls")}
             </span>
             <span className="flex items-center gap-2">
-              <Mail className="h-4 w-4" /> Email or Google sign-in
+              <Mail className="h-4 w-4" /> {t("login.heroEmailGoogle")}
             </span>
           </div>
         </div>
-        <p className="text-xs text-primary-foreground/70">
-          Independent from Teletalk or any government body.
-        </p>
+        <p className="text-xs text-primary-foreground/70">{t("login.heroDisclaimer")}</p>
       </section>
 
-      <main className="flex items-center justify-center px-4 py-10">
+      <main className="relative flex items-center justify-center px-4 py-10">
+        <div className="absolute right-4 top-4 lg:hidden">
+          <LanguageToggle />
+        </div>
         <div className="w-full max-w-sm">
           <Link
             to="/"
@@ -102,22 +104,20 @@ function LoginPage() {
 
           <div className="rounded-2xl border bg-card p-6 shadow-xl shadow-primary/10">
             <div className="mb-5">
-              <h1 className="text-2xl font-bold">Welcome back</h1>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Access your matches, saved jobs, and profile.
-              </p>
+              <h1 className="text-2xl font-bold">{t("login.welcomeBack")}</h1>
+              <p className="mt-1 text-sm text-muted-foreground">{t("login.subtitle")}</p>
             </div>
 
             <Tabs defaultValue="login">
               <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="login">Log in</TabsTrigger>
-                <TabsTrigger value="signup">Sign up</TabsTrigger>
+                <TabsTrigger value="login">{t("login.logIn")}</TabsTrigger>
+                <TabsTrigger value="signup">{t("login.signUp")}</TabsTrigger>
               </TabsList>
 
               <TabsContent value="login">
                 <form onSubmit={handleLogin} className="mt-4 space-y-3">
                   <div>
-                    <Label>Email</Label>
+                    <Label>{t("login.email")}</Label>
                     <Input
                       type="email"
                       value={email}
@@ -126,7 +126,7 @@ function LoginPage() {
                     />
                   </div>
                   <div>
-                    <Label>Password</Label>
+                    <Label>{t("login.password")}</Label>
                     <Input
                       type="password"
                       value={password}
@@ -135,7 +135,7 @@ function LoginPage() {
                     />
                   </div>
                   <Button type="submit" className="w-full" disabled={loading}>
-                    Log in
+                    {t("login.logIn")}
                   </Button>
                 </form>
               </TabsContent>
@@ -143,7 +143,7 @@ function LoginPage() {
               <TabsContent value="signup">
                 <form onSubmit={handleSignup} className="mt-4 space-y-3">
                   <div>
-                    <Label>Email</Label>
+                    <Label>{t("login.email")}</Label>
                     <Input
                       type="email"
                       value={email}
@@ -152,7 +152,7 @@ function LoginPage() {
                     />
                   </div>
                   <div>
-                    <Label>Password</Label>
+                    <Label>{t("login.password")}</Label>
                     <Input
                       type="password"
                       value={password}
@@ -162,17 +162,18 @@ function LoginPage() {
                     />
                   </div>
                   <Button type="submit" className="w-full" disabled={loading}>
-                    Create account
+                    {t("login.createAccount")}
                   </Button>
                 </form>
               </TabsContent>
             </Tabs>
 
             <div className="my-5 flex items-center gap-2 text-xs text-muted-foreground">
-              <div className="h-px flex-1 bg-border" /> or <div className="h-px flex-1 bg-border" />
+              <div className="h-px flex-1 bg-border" /> {t("login.or")}{" "}
+              <div className="h-px flex-1 bg-border" />
             </div>
             <Button variant="outline" className="w-full" onClick={handleGoogle}>
-              Continue with Google
+              {t("login.continueGoogle")}
             </Button>
           </div>
         </div>

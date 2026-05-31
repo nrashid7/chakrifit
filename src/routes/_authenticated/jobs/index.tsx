@@ -26,6 +26,7 @@ import {
   Loader2,
   Search,
 } from "lucide-react";
+import { eligibilityLabel, useT } from "@/i18n";
 
 export const Route = createFileRoute("/_authenticated/jobs/")({
   head: () => ({ meta: [{ title: "Browse jobs | ChakriFit" }] }),
@@ -54,6 +55,7 @@ type Filter = "all" | "eligible" | "partial" | "not_eligible" | "saved" | "deadl
 type Sort = "deadline_asc" | "score_desc" | "newest";
 
 function JobsBrowser() {
+  const t = useT();
   const qc = useQueryClient();
   const listJobsFn = useServerFn(listJobs);
   const listMatchesFn = useServerFn(listMatches);
@@ -133,7 +135,7 @@ function JobsBrowser() {
   async function handleToggle(jobId: string) {
     try {
       const r = await toggleFn({ data: { jobId } });
-      toast.success(r.saved ? "Saved" : "Removed");
+      toast.success(r.saved ? t("common.saved") : t("common.removed"));
       qc.invalidateQueries({ queryKey: ["saved"] });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed");
@@ -143,11 +145,8 @@ function JobsBrowser() {
   return (
     <div className="space-y-6">
       <header className="rounded-2xl border bg-card p-5 shadow-sm sm:p-6">
-        <h1 className="text-3xl font-bold">Browse government jobs</h1>
-        <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-          Every circular ingested from Teletalk Alljobs. Filter by eligibility, save what you want
-          to apply for, and open the official PDF in one click.
-        </p>
+        <h1 className="text-3xl font-bold">{t("jobs.title")}</h1>
+        <p className="mt-2 max-w-2xl text-sm text-muted-foreground">{t("jobs.subtitle")}</p>
       </header>
 
       <section className="rounded-2xl border bg-card p-4 shadow-sm sm:p-5">
@@ -157,7 +156,7 @@ function JobsBrowser() {
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by title or organization..."
+              placeholder={t("jobs.searchPlaceholder")}
               className="pl-9"
             />
           </div>
@@ -166,21 +165,25 @@ function JobsBrowser() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="deadline_asc">Deadline (soonest)</SelectItem>
-              <SelectItem value="score_desc">Match score (highest)</SelectItem>
-              <SelectItem value="newest">Newest crawled</SelectItem>
+              <SelectItem value="deadline_asc">{t("jobs.sort.deadline")}</SelectItem>
+              <SelectItem value="score_desc">{t("jobs.sort.score")}</SelectItem>
+              <SelectItem value="newest">{t("jobs.sort.newest")}</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
         <Tabs value={filter} onValueChange={(v) => setFilter(v as Filter)} className="mt-4">
           <TabsList className="flex w-full flex-wrap justify-start gap-1 bg-muted/60 p-1">
-            <TabsTrigger value="all">All ({allJobs.length})</TabsTrigger>
-            <TabsTrigger value="eligible">Eligible</TabsTrigger>
-            <TabsTrigger value="partial">Partial</TabsTrigger>
-            <TabsTrigger value="not_eligible">Not eligible</TabsTrigger>
-            <TabsTrigger value="saved">Saved ({savedSet.size})</TabsTrigger>
-            <TabsTrigger value="deadline_soon">Deadline soon</TabsTrigger>
+            <TabsTrigger value="all">
+              {t("jobs.filter.all")} ({allJobs.length})
+            </TabsTrigger>
+            <TabsTrigger value="eligible">{t("jobs.filter.eligible")}</TabsTrigger>
+            <TabsTrigger value="partial">{t("jobs.filter.partial")}</TabsTrigger>
+            <TabsTrigger value="not_eligible">{t("jobs.filter.notEligible")}</TabsTrigger>
+            <TabsTrigger value="saved">
+              {t("jobs.filter.saved")} ({savedSet.size})
+            </TabsTrigger>
+            <TabsTrigger value="deadline_soon">{t("jobs.filter.deadlineSoon")}</TabsTrigger>
           </TabsList>
         </Tabs>
       </section>
@@ -188,11 +191,11 @@ function JobsBrowser() {
       {jobs.isLoading ? (
         <div className="py-16 text-center text-muted-foreground">
           <Loader2 className="mx-auto h-5 w-5 animate-spin text-primary" />
-          <p className="mt-3 text-sm">Loading jobs...</p>
+          <p className="mt-3 text-sm">{t("jobs.loading")}</p>
         </div>
       ) : visible.length === 0 ? (
         <div className="rounded-2xl border bg-card p-10 text-center text-sm text-muted-foreground">
-          No jobs match these filters.
+          {t("jobs.noResults")}
         </div>
       ) : (
         <div className="grid gap-3">
@@ -212,7 +215,7 @@ function JobsBrowser() {
                           variant={m.status === "eligible" ? "default" : "outline"}
                           className="capitalize"
                         >
-                          {m.status.replace("_", " ")}
+                          {eligibilityLabel(m.status, t)}
                         </Badge>
                       )}
                       {j.deadline && (
@@ -222,7 +225,7 @@ function JobsBrowser() {
                         </Badge>
                       )}
                       {j.salary && <Badge variant="outline">{j.salary}</Badge>}
-                      <RequirementsBadge status={getRequirementsStatus(j.parsed_json)} />
+                      <RequirementsBadge status={getRequirementsStatus(j.parsed_json)} t={t} />
                     </div>
                     <Link
                       to="/jobs/$jobId"
@@ -235,7 +238,7 @@ function JobsBrowser() {
                       <ArrowRight className="h-4 w-4 shrink-0 text-primary" />
                     </Link>
                     <p className="mt-1 truncate text-sm text-muted-foreground">
-                      {j.organization ?? "Bangladesh government"}
+                      {j.organization ?? t("common.bangladeshGov")}
                     </p>
                   </div>
                   <div className="flex items-center justify-between gap-3 lg:flex-col lg:items-end">
@@ -247,12 +250,16 @@ function JobsBrowser() {
                     <div className="flex flex-wrap justify-end gap-2">
                       <Link to="/jobs/$jobId" params={{ jobId: j.id }}>
                         <Button size="sm" variant="outline">
-                          Details
+                          {t("common.details")}
                         </Button>
                       </Link>
                       {j.circular_url && (
                         <a href={j.circular_url} target="_blank" rel="noreferrer">
-                          <Button size="icon" variant="outline" aria-label="Open official circular">
+                          <Button
+                            size="icon"
+                            variant="outline"
+                            aria-label={t("job.officialCircular")}
+                          >
                             <ExternalLink className="h-4 w-4" />
                           </Button>
                         </a>
@@ -260,7 +267,7 @@ function JobsBrowser() {
                       <Button
                         size="icon"
                         variant="ghost"
-                        aria-label={isSaved ? "Remove saved" : "Save job"}
+                        aria-label={isSaved ? t("common.saved") : t("job.saveJob")}
                         onClick={() => handleToggle(j.id)}
                       >
                         {isSaved ? (
@@ -287,8 +294,14 @@ function getRequirementsStatus(value: unknown): RequirementsStatus {
   return status === "parsed" || status === "partial" || status === "unknown" ? status : "unknown";
 }
 
-function RequirementsBadge({ status }: { status: RequirementsStatus }) {
-  if (status === "parsed") return <Badge variant="secondary">Parsed requirements</Badge>;
-  if (status === "partial") return <Badge variant="outline">Partial requirements</Badge>;
-  return <Badge variant="outline">Verify circular</Badge>;
+function RequirementsBadge({
+  status,
+  t,
+}: {
+  status: RequirementsStatus;
+  t: ReturnType<typeof useT>;
+}) {
+  if (status === "parsed") return <Badge variant="secondary">{t("req.parsed")}</Badge>;
+  if (status === "partial") return <Badge variant="outline">{t("req.partial")}</Badge>;
+  return <Badge variant="outline">{t("req.verify")}</Badge>;
 }

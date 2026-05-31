@@ -1,6 +1,8 @@
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { BriefcaseBusiness, ShieldCheck } from "lucide-react";
+import { LanguageToggle } from "@/components/language-toggle";
+import { useT } from "@/i18n";
 
 export function SiteHeader({ right }: { right?: ReactNode }) {
   return (
@@ -12,32 +14,35 @@ export function SiteHeader({ right }: { right?: ReactNode }) {
           </span>
           <span className="truncate">ChakriFit</span>
         </Link>
-        <div className="flex min-w-0 items-center gap-2 overflow-x-auto text-sm">{right}</div>
+        <div className="flex min-w-0 items-center gap-1 overflow-x-auto text-sm sm:gap-2">
+          <LanguageToggle />
+          {right}
+        </div>
       </div>
     </header>
   );
 }
 
 export function SiteFooter() {
+  const t = useT();
   return (
     <footer className="mt-16 border-t bg-background/80 py-8 text-sm text-muted-foreground">
       <div className="mx-auto flex max-w-7xl flex-col gap-5 px-4 sm:px-6 md:flex-row md:items-center md:justify-between">
         <div className="max-w-xl">
           <div className="flex items-center gap-2 font-medium text-foreground">
             <ShieldCheck className="h-4 w-4 text-primary" />
-            Independent eligibility guidance for Bangladesh government jobs
+            {t("landing.footerTagline")}
           </div>
           <p className="mt-2 text-xs">
-            © {new Date().getFullYear()} ChakriFit. Not affiliated with Teletalk, the Government of
-            Bangladesh, or any recruiting body.
+            © {new Date().getFullYear()} ChakriFit. {t("landing.footerDisclaimer")}
           </p>
         </div>
         <nav className="flex gap-4 text-xs" aria-label="Footer">
           <Link to="/privacy" className="hover:text-foreground">
-            Privacy
+            {t("landing.privacy")}
           </Link>
           <Link to="/terms" className="hover:text-foreground">
-            Terms
+            {t("landing.terms")}
           </Link>
         </nav>
       </div>

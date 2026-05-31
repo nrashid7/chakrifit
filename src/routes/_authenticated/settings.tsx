@@ -18,6 +18,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
+import { useT } from "@/i18n";
 import { Bell, Loader2, LogOut, Mail, ShieldCheck, Trash2 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/settings")({
@@ -26,6 +27,7 @@ export const Route = createFileRoute("/_authenticated/settings")({
 });
 
 function Settings() {
+  const t = useT();
   const navigate = useNavigate();
   const delResumeFn = useServerFn(deleteResume);
   const delAcctFn = useServerFn(deleteAccount);
@@ -45,7 +47,7 @@ function Settings() {
     setBusy("resume");
     try {
       await delResumeFn();
-      toast.success("Resume deleted");
+      toast.success(t("settings.resumeDeleted"));
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed");
     } finally {
@@ -58,7 +60,7 @@ function Settings() {
     try {
       await delAcctFn();
       await supabase.auth.signOut();
-      toast.success("Account deleted");
+      toast.success(t("settings.accountDeleted"));
       navigate({ to: "/", replace: true });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed");
@@ -69,35 +71,33 @@ function Settings() {
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <div className="rounded-2xl border bg-card p-6 shadow-sm">
-        <p className="text-sm font-semibold uppercase text-primary">Account controls</p>
-        <h1 className="mt-2 text-3xl font-bold">Settings</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Manage your account, notifications, and private resume data.
-        </p>
+        <p className="text-sm font-semibold uppercase text-primary">{t("settings.badge")}</p>
+        <h1 className="mt-2 text-3xl font-bold">{t("settings.title")}</h1>
+        <p className="mt-2 text-sm text-muted-foreground">{t("settings.subtitle")}</p>
       </div>
 
-      <Card title="Account" icon={<Mail className="h-4 w-4 text-primary" />}>
-        <Row icon={<Mail className="h-4 w-4 text-muted-foreground" />} label="Email">
-          <span className="text-sm">{email || "Not available"}</span>
+      <Card title={t("settings.account")} icon={<Mail className="h-4 w-4 text-primary" />}>
+        <Row icon={<Mail className="h-4 w-4 text-muted-foreground" />} label={t("settings.email")}>
+          <span className="text-sm">{email || t("settings.notAvailable")}</span>
         </Row>
-        <Row label="Sign out">
+        <Row label={t("settings.signOut")}>
           <Button variant="outline" size="sm" onClick={signOut}>
-            <LogOut className="h-3 w-3" /> Sign out
+            <LogOut className="h-3 w-3" /> {t("settings.signOut")}
           </Button>
         </Row>
       </Card>
 
-      <Card title="Notifications" icon={<Bell className="h-4 w-4 text-primary" />}>
-        <Row label="Email me when new matching jobs are crawled">
+      <Card title={t("settings.notifications")} icon={<Bell className="h-4 w-4 text-primary" />}>
+        <Row label={t("settings.notifyNewJobs")}>
           <div className="flex items-center gap-2">
             <Switch disabled />
-            <span className="text-xs text-muted-foreground">Coming soon</span>
+            <span className="text-xs text-muted-foreground">{t("settings.comingSoon")}</span>
           </div>
         </Row>
       </Card>
 
-      <Card title="Your data" icon={<ShieldCheck className="h-4 w-4 text-primary" />}>
-        <Row label="Uploaded resume">
+      <Card title={t("settings.yourData")} icon={<ShieldCheck className="h-4 w-4 text-primary" />}>
+        <Row label={t("settings.uploadedResume")}>
           <Button
             variant="outline"
             size="sm"
@@ -109,10 +109,10 @@ function Settings() {
             ) : (
               <Trash2 className="h-3 w-3" />
             )}
-            Delete resume
+            {t("settings.deleteResume")}
           </Button>
         </Row>
-        <Row label="Delete account">
+        <Row label={t("settings.deleteAccount")}>
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="destructive" size="sm" disabled={busy === "account"}>
@@ -121,21 +121,18 @@ function Settings() {
                 ) : (
                   <Trash2 className="h-3 w-3" />
                 )}
-                Delete account
+                {t("settings.deleteAccount")}
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Delete your ChakriFit account?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This permanently deletes your profile, resume, saved jobs and match history. This
-                  cannot be undone.
-                </AlertDialogDescription>
+                <AlertDialogTitle>{t("settings.deleteAccountTitle")}</AlertDialogTitle>
+                <AlertDialogDescription>{t("settings.deleteAccountDesc")}</AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
                 <AlertDialogAction onClick={handleDeleteAccount}>
-                  Yes, delete everything
+                  {t("settings.deleteEverything")}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>

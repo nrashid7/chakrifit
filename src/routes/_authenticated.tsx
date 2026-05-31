@@ -10,6 +10,7 @@ import {
   Settings as SettingsIcon,
   UserRound,
 } from "lucide-react";
+import { useT } from "@/i18n";
 
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: async () => {
@@ -21,6 +22,7 @@ export const Route = createFileRoute("/_authenticated")({
 
 function AuthedLayout() {
   const navigate = useNavigate();
+  const t = useT();
   async function signOut() {
     await supabase.auth.signOut();
     navigate({ to: "/", replace: true });
@@ -33,33 +35,33 @@ function AuthedLayout() {
             <Link to="/dashboard">
               <Button variant="ghost" size="sm">
                 <LayoutDashboard className="h-4 w-4" />
-                <span className="hidden sm:inline">Dashboard</span>
+                <span className="hidden sm:inline">{t("nav.dashboard")}</span>
               </Button>
             </Link>
             <Link to="/jobs">
               <Button variant="ghost" size="sm">
                 <BriefcaseBusiness className="h-4 w-4" />
-                <span className="hidden sm:inline">Browse Jobs</span>
+                <span className="hidden sm:inline">{t("nav.browseJobs")}</span>
               </Button>
             </Link>
             <Link to="/profile">
               <Button variant="ghost" size="sm">
                 <UserRound className="h-4 w-4" />
-                <span className="hidden sm:inline">Profile</span>
+                <span className="hidden sm:inline">{t("nav.profile")}</span>
               </Button>
             </Link>
             <Link to="/saved">
               <Button variant="ghost" size="sm">
                 <Bookmark className="h-4 w-4" />
-                <span className="hidden sm:inline">Saved</span>
+                <span className="hidden sm:inline">{t("nav.saved")}</span>
               </Button>
             </Link>
             <Link to="/settings">
-              <Button variant="ghost" size="sm" aria-label="Settings">
+              <Button variant="ghost" size="sm" aria-label={t("nav.settings")}>
                 <SettingsIcon className="h-4 w-4" />
               </Button>
             </Link>
-            <Button variant="ghost" size="sm" onClick={signOut} aria-label="Log out">
+            <Button variant="ghost" size="sm" onClick={signOut} aria-label={t("nav.signOut")}>
               <LogOut className="h-4 w-4" />
             </Button>
           </>
