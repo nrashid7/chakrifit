@@ -95,8 +95,24 @@ function Dashboard() {
       </div>
 
       {all.length === 0 ? (
-        <div className="rounded-2xl border bg-card p-8 text-center">
-          <p className="text-muted-foreground">No matches yet. Click "Recompute matches" to score available jobs against your profile.</p>
+        <div className="rounded-2xl border bg-card p-8 text-center space-y-4">
+          <p className="text-muted-foreground">No matches yet. Fetch new circulars or update your profile.</p>
+          <div className="flex justify-center gap-2">
+            <Button
+              size="sm"
+              onClick={async () => {
+                await crawl.mutateAsync();
+                compute.mutate();
+              }}
+              disabled={crawl.isPending || compute.isPending}
+            >
+              {(crawl.isPending || compute.isPending) ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              <span className="ml-1">Fetch jobs &amp; recompute</span>
+            </Button>
+            <Link to="/onboarding">
+              <Button variant="outline" size="sm">Update profile</Button>
+            </Link>
+          </div>
         </div>
       ) : (
         <>
