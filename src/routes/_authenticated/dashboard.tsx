@@ -54,11 +54,17 @@ function Dashboard() {
   const toggleFn = useServerFn(toggleSave);
   const explainFn = useServerFn(explainMatch);
   const adminFn = useServerFn(amIAdmin);
+  const latestRunFn = useServerFn(latestCrawlRun);
 
   const profile = useQuery({ queryKey: ["profile"], queryFn: () => profileFn() });
   const matches = useQuery({ queryKey: ["matches"], queryFn: () => matchesFn() });
   const admin = useQuery({ queryKey: ["am-i-admin"], queryFn: () => adminFn() });
   const isAdmin = admin.data?.isAdmin ?? false;
+  const latestRun = useQuery({
+    queryKey: ["latest-crawl-run"],
+    queryFn: () => latestRunFn(),
+    enabled: isAdmin,
+  });
 
   useEffect(() => {
     if (profile.isLoading) return;
