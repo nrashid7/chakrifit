@@ -32,19 +32,19 @@ function AuthedLayout() {
             <Link to="/dashboard">
               <Button variant="ghost" size="sm">
                 <BriefcaseBusiness className="h-4 w-4" />
-                Jobs
+                <span className="hidden sm:inline">Jobs</span>
               </Button>
             </Link>
             <Link to="/profile">
               <Button variant="ghost" size="sm">
                 <UserRound className="h-4 w-4" />
-                Profile
+                <span className="hidden sm:inline">Profile</span>
               </Button>
             </Link>
             <Link to="/saved">
               <Button variant="ghost" size="sm">
                 <Bookmark className="h-4 w-4" />
-                Saved
+                <span className="hidden sm:inline">Saved</span>
               </Button>
             </Link>
             <Link to="/settings">
