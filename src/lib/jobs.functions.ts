@@ -54,3 +54,15 @@ export const latestCrawlRun = createServerFn({ method: "GET" })
     }
     return getLatestCrawlRun();
   });
+
+export const cancelCrawlRun = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ runId: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const adminEmail = process.env.ADMIN_EMAIL;
+    const { data: userData } = await context.supabase.auth.getUser();
+    if (!adminEmail || userData.user?.email !== adminEmail) {
+      throw new Error("Unauthorized");
+    }
+    return cancelCrawlRunInDb(data.runId);
+  });
