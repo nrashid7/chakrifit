@@ -384,7 +384,10 @@ export async function crawlGovernmentJobs(limit: number, triggeredBy?: string) {
 
   async function updateProgress(fields: Record<string, unknown>) {
     if (!runId) return;
-    await supabaseAdmin.from("crawl_runs").update(fields).eq("id", runId);
+    await supabaseAdmin
+      .from("crawl_runs")
+      .update(fields as never)
+      .eq("id", runId);
   }
 
   const pageSize = Math.min(20, Math.max(5, limit));
