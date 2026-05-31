@@ -229,13 +229,13 @@ export async function crawlGovernmentJobs(limit: number, triggeredBy?: string) {
           organization: parsed?.organization ?? orgName,
           description:
             parsed?.summary ??
-            [
+            ([
               detail.advertisement_no && `Advertisement: ${detail.advertisement_no}`,
               detail.vacancy && `Vacancy: ${detail.vacancy}`,
             ]
               .filter(Boolean)
               .join("\n") ||
-            null,
+              null),
           deadline: parsed?.deadline || toIsoDate(detail.deadline_date),
           salary: parsed?.salary ?? null,
           age_limit: ageLimit,
