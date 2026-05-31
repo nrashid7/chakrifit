@@ -186,11 +186,7 @@ function Dashboard() {
       </section>
 
       {isAdmin && (
-        <CrawlStatusPanel
-          run={(latestRun.data?.run ?? null) as CrawlRun | null}
-          isLoading={latestRun.isLoading}
-          isRunning={crawl.isPending}
-        />
+        <CrawlStatusPanel run={runRow} isLoading={latestRun.isLoading} />
       )}
 
       {all.length === 0 ? (
