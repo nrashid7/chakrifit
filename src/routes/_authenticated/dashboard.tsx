@@ -93,8 +93,10 @@ function Dashboard() {
   });
   const crawl = useMutation({
     mutationFn: () => crawlFn({ data: { limit: 8 } }),
+    onMutate: () => qc.invalidateQueries({ queryKey: ["latest-crawl-run"] }),
     onSuccess: (r) => {
-      toast.success(`Saved or updated ${r.succeeded} jobs`);
+      if (r.status === "cancelled") toast.info("Crawl cancelled");
+      else toast.success(`Saved or updated ${r.succeeded} jobs`);
       qc.invalidateQueries({ queryKey: ["jobs"] });
       qc.invalidateQueries({ queryKey: ["matches"] });
       qc.invalidateQueries({ queryKey: ["latest-crawl-run"] });
@@ -103,6 +105,16 @@ function Dashboard() {
       toast.error(e.message);
       qc.invalidateQueries({ queryKey: ["latest-crawl-run"] });
     },
+  });
+  const runRow = (latestRun.data?.run ?? null) as CrawlRun | null;
+  const isRunning = runRow?.status === "running" || runRow?.status === "queued";
+  const cancel = useMutation({
+    mutationFn: (runId: string) => cancelFn({ data: { runId } }),
+    onSuccess: () => {
+      toast.info("Cancelling current crawl...");
+      qc.invalidateQueries({ queryKey: ["latest-crawl-run"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   if (profile.isLoading) return <DashboardSkeleton />;
