@@ -2,7 +2,7 @@ import { createFileRoute, Outlet, redirect, Link, useNavigate } from "@tanstack/
 import { supabase } from "@/integrations/supabase/client";
 import { SiteHeader } from "@/components/site-chrome";
 import { Button } from "@/components/ui/button";
-import { LogOut } from "lucide-react";
+import { LogOut, Settings as SettingsIcon } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: async () => {
@@ -26,6 +26,7 @@ function AuthedLayout() {
             <Link to="/dashboard"><Button variant="ghost" size="sm">Jobs</Button></Link>
             <Link to="/profile"><Button variant="ghost" size="sm">Profile</Button></Link>
             <Link to="/saved"><Button variant="ghost" size="sm">Saved</Button></Link>
+            <Link to="/settings"><Button variant="ghost" size="sm" aria-label="Settings"><SettingsIcon className="h-4 w-4" /></Button></Link>
             <Button variant="ghost" size="sm" onClick={signOut} aria-label="Log out">
               <LogOut className="h-4 w-4" />
             </Button>
