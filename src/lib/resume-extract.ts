@@ -29,9 +29,9 @@ async function extractPdf(file: File): Promise<string> {
 
 async function extractDocx(file: File): Promise<string> {
   // mammoth ships a browser build but no types for the subpath
-  const mammoth = (await import(
-    /* @vite-ignore */ "mammoth/mammoth.browser"
-  )) as { extractRawText: (opts: { arrayBuffer: ArrayBuffer }) => Promise<{ value: string }> };
+  const mammoth = (await import("mammoth/mammoth.browser")) as {
+    extractRawText: (opts: { arrayBuffer: ArrayBuffer }) => Promise<{ value: string }>;
+  };
   const buf = await file.arrayBuffer();
   const result = await mammoth.extractRawText({ arrayBuffer: buf });
   return (result.value ?? "").trim();

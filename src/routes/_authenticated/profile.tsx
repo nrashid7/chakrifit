@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { getMyProfile, parseResumeText, saveProfile, type ParsedResumeData } from "@/lib/resume.functions";
-import { extractResumeText } from "@/lib/resume-extract";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -62,7 +62,8 @@ function ProfilePage() {
   async function handleFile(file: File) {
     setParsing(true);
     try {
-      // 1. Extract text in browser
+      // 1. Extract text in browser (dynamic import keeps pdfjs/mammoth out of SSR bundle)
+      const { extractResumeText } = await import("@/lib/resume-extract");
       const text = await extractResumeText(file);
       if (text.length < 50) throw new Error("Could not read resume text. Try a different file.");
       setExtractedText(text);
