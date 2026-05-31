@@ -4,6 +4,37 @@ ChakriFit ingests Bangladesh government job circulars from the public Teletalk
 Alljobs JSON API. Teletalk is the canonical source; the crawler does not use
 third-party job websites.
 
+## Listing Response Shape
+
+`GET /api/v1/govt-jobs/list?page={n}&limit={k}` returns individual job
+openings, not organization cards. Each item in `govtJobs` is one post with its
+own numeric `id`, `job_id` (for example `GJOB13749`), `job_title`,
+`organization_id`, vacancy, and deadline. The response also includes `count`,
+the total number of active listings across all pages.
+
+Example fields on each list item:
+
+```json
+{
+  "id": 13749,
+  "job_title": "Assistant Maintenance Engineer",
+  "job_id": "GJOB13749",
+  "vacancy": "01",
+  "deadline_date": "2026-06-20T11:00:00.000Z",
+  "organization_id": 1144,
+  "job_utilities_govtorganization": {
+    "name": "National Pension Authority(NPA)"
+  }
+}
+```
+
+Pagination stops when a page returns zero jobs, when the accumulated list
+reaches `count`, or when a safety page cap is reached during full sync.
+
+Clicking “View job” on the public site loads detail from
+`/api/v1/govt-jobs/public-details?id={numericId}`. No separate openings
+expansion endpoint is required for the list items above.
+
 ## Official Endpoints
 
 | Purpose       | Method | Path                                              |
@@ -101,7 +132,12 @@ The UI labels unknown fields as `Not parsed yet - verify official circular`.
 
 ## Cost Controls
 
-- A manual or scheduled crawl enriches at most 20 PDFs.
+- Quick crawl processes up to 30 jobs for testing; full sync paginates all
+  active Teletalk listings (up to 100 pages).
+- Every crawl enriches at most 20 PDFs via Mistral OCR
+  (`MAX_PDF_ENRICHMENTS_PER_RUN`), regardless of how many jobs are upserted.
+- Full sync always upserts API rows even when the OCR cap is reached; remaining
+  jobs are saved with `requirements_status = unknown` or `partial`.
 - Existing rows are not re-parsed when the same `circular_pdf_url` already has
   `requirements_status = parsed` and high post-match confidence.
 - OCR calls run sequentially with a one second delay between PDFs.

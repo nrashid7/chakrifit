@@ -94,7 +94,7 @@ function Dashboard() {
     onError: (e: Error) => toast.error(e.message),
   });
   const crawl = useMutation({
-    mutationFn: () => crawlFn({ data: { limit: 8 } }),
+    mutationFn: (input: { mode: "quick" | "full"; limit?: number }) => crawlFn({ data: input }),
     onMutate: () => qc.invalidateQueries({ queryKey: ["latest-crawl-run"] }),
     onSuccess: (r) => {
       if (r.status === "cancelled") toast.info(t("dash.crawlCancelled"));
@@ -143,40 +143,59 @@ function Dashboard() {
                 : t("dash.subtitleEmpty")}
             </p>
           </div>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            {isAdmin && (
-              <>
-                <Button
-                  variant="outline"
-                  onClick={() => crawl.mutate()}
-                  disabled={crawl.isPending || isRunning}
-                >
-                  {crawl.isPending || isRunning ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <RefreshCw className="h-4 w-4" />
-                  )}
-                  {t("dash.fetchCirculars")}
-                </Button>
-                {isRunning && runRow && (
+          <div className="flex flex-col gap-3 lg:items-end">
+            <div className="flex flex-col gap-2 sm:flex-row">
+              {isAdmin && (
+                <>
                   <Button
-                    variant="ghost"
-                    onClick={() => cancel.mutate(runRow.id)}
-                    disabled={cancel.isPending}
+                    variant="outline"
+                    onClick={() => crawl.mutate({ mode: "quick", limit: 8 })}
+                    disabled={crawl.isPending || isRunning}
                   >
-                    {t("common.cancel")}
+                    {crawl.isPending || isRunning ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-4 w-4" />
+                    )}
+                    {t("dash.quickFetch")}
                   </Button>
-                )}
-              </>
-            )}
-            <Button onClick={() => compute.mutate()} disabled={compute.isPending}>
-              {compute.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Sparkles className="h-4 w-4" />
+                  <Button
+                    variant="outline"
+                    onClick={() => crawl.mutate({ mode: "full" })}
+                    disabled={crawl.isPending || isRunning}
+                  >
+                    {crawl.isPending || isRunning ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-4 w-4" />
+                    )}
+                    {t("dash.fullSync")}
+                  </Button>
+                  {isRunning && runRow && (
+                    <Button
+                      variant="ghost"
+                      onClick={() => cancel.mutate(runRow.id)}
+                      disabled={cancel.isPending}
+                    >
+                      {t("common.cancel")}
+                    </Button>
+                  )}
+                </>
               )}
-              {t("dash.recompute")}
-            </Button>
+              <Button onClick={() => compute.mutate()} disabled={compute.isPending}>
+                {compute.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Sparkles className="h-4 w-4" />
+                )}
+                {t("dash.recompute")}
+              </Button>
+            </div>
+            {isAdmin && (
+              <p className="text-xs text-muted-foreground lg:max-w-md lg:text-right">
+                {t("dash.fullSyncHint")}
+              </p>
+            )}
           </div>
         </div>
         <div className="mt-6 grid gap-3 sm:grid-cols-4">
@@ -196,7 +215,7 @@ function Dashboard() {
           crawlPending={crawl.isPending}
           computePending={compute.isPending}
           onCrawlAndCompute={async () => {
-            await crawl.mutateAsync();
+            await crawl.mutateAsync({ mode: "quick", limit: 8 });
             compute.mutate();
           }}
           onCompute={() => compute.mutate()}
@@ -546,8 +565,26 @@ function formatTime(value?: string | null) {
   return value ? new Date(value).toLocaleString() : "—";
 }
 
+function parseCrawlStrategy(errors: CrawlRun["errors"]) {
+  const strategy = Array.isArray(errors)
+    ? errors.find((entry) => entry.url === "strategy")
+    : undefined;
+  if (!strategy) return null;
+  try {
+    return JSON.parse(strategy.error) as {
+      mode?: string;
+      enriched?: number;
+      ocr_attempts?: number;
+      skipped_enrichment?: number;
+    };
+  } catch {
+    return null;
+  }
+}
+
 function CrawlStatusPanel({ run, isLoading }: { run: CrawlRun | null; isLoading: boolean }) {
   const errors = Array.isArray(run?.errors) ? run!.errors.filter((e) => e.url !== "strategy") : [];
+  const strategy = parseCrawlStrategy(run?.errors ?? null);
   const meta = STATUS_META[run?.status ?? "none"];
   const StatusIcon = meta.Icon;
   const toneClass =
@@ -607,8 +644,8 @@ function CrawlStatusPanel({ run, isLoading }: { run: CrawlRun | null; isLoading:
       )}
 
       <div className="mt-5 grid gap-3 sm:grid-cols-4">
-        <Metric label="URLs found" value={run?.discovered ?? 0} />
-        <Metric label="Attempts" value={run?.attempted ?? 0} />
+        <Metric label="Jobs discovered" value={run?.discovered ?? 0} />
+        <Metric label="API processed" value={run?.attempted ?? 0} />
         <Metric label="Saved" value={run?.succeeded ?? 0} tone="success" />
         <Metric
           label="Errors"
@@ -616,6 +653,15 @@ function CrawlStatusPanel({ run, isLoading }: { run: CrawlRun | null; isLoading:
           tone={(run?.failed ?? 0) > 0 ? "warning" : undefined}
         />
       </div>
+
+      {strategy && (
+        <div className="mt-5 grid gap-3 sm:grid-cols-4">
+          <Metric label="OCR attempts" value={strategy.ocr_attempts ?? 0} />
+          <Metric label="Enriched" value={strategy.enriched ?? 0} tone="success" />
+          <Metric label="Skipped OCR" value={strategy.skipped_enrichment ?? 0} />
+          <Metric label="Mode" value={strategy.mode ?? "quick"} />
+        </div>
+      )}
 
       {errors.length > 0 && (
         <div className="mt-5">

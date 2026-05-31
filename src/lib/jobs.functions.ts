@@ -28,12 +28,15 @@ export const amIAdmin = createServerFn({ method: "GET" })
     return { isAdmin: data.user?.email === adminEmail };
   });
 
+const crawlJobsInputSchema = z.object({
+  limit: z.number().min(1).max(30).optional(),
+  mode: z.enum(["quick", "full"]).default("quick"),
+});
+
 // Admin-only manual crawler.
 export const crawlJobs = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
-    z.object({ limit: z.number().min(1).max(30).default(8) }).parse(input ?? {}),
-  )
+  .inputValidator((input: unknown) => crawlJobsInputSchema.parse(input ?? {}))
   .handler(async ({ data, context }) => {
     const adminEmail = process.env.ADMIN_EMAIL;
     const { data: userData } = await context.supabase.auth.getUser();
@@ -41,7 +44,11 @@ export const crawlJobs = createServerFn({ method: "POST" })
     if (!adminEmail || email !== adminEmail) {
       throw new Error("Unauthorized");
     }
-    return crawlGovernmentJobs(data.limit, userData.user?.id);
+    return crawlGovernmentJobs({
+      mode: data.mode,
+      limit: data.mode === "full" ? undefined : (data.limit ?? 8),
+      triggeredBy: userData.user?.id,
+    });
   });
 
 export const latestCrawlRun = createServerFn({ method: "GET" })

@@ -4,6 +4,18 @@ const API_BASE = "https://alljobs.teletalk.com.bd/api/v1";
 const MEDIA_BASE = "https://alljobs.teletalk.com.bd/media";
 const SITE_BASE = "https://alljobs.teletalk.com.bd";
 const MAX_PDF_ENRICHMENTS_PER_RUN = 20;
+const QUICK_DEFAULT_LIMIT = 8;
+const QUICK_MAX_LIMIT = 30;
+const TELETALK_PAGE_SIZE = 20;
+const FULL_CRAWL_MAX_PAGES = 100;
+
+export type CrawlMode = "quick" | "full";
+
+export type CrawlGovernmentJobsOptions = {
+  limit?: number;
+  mode?: CrawlMode;
+  triggeredBy?: string;
+};
 
 export type RequirementsStatus = "parsed" | "partial" | "unknown";
 
@@ -465,6 +477,81 @@ export function buildJobDescription({
   );
 }
 
+function buildCrawlProgressMessage({
+  discovered,
+  processed,
+  total,
+  ocrAttempts,
+  enriched,
+  skippedEnrichment,
+}: {
+  discovered: number;
+  processed: number;
+  total: number;
+  ocrAttempts: number;
+  enriched: number;
+  skippedEnrichment: number;
+}) {
+  return [
+    `Discovered ${discovered} jobs`,
+    `API processed ${processed} / ${total}`,
+    `OCR attempts ${ocrAttempts}`,
+    `Enriched ${enriched}`,
+    `Skipped enrichment ${skippedEnrichment}`,
+  ].join(" · ");
+}
+
+async function discoverTeletalkJobs({
+  mode,
+  limit,
+  isCancelled,
+}: {
+  mode: CrawlMode;
+  limit: number;
+  isCancelled: () => Promise<boolean>;
+}): Promise<{ listed: TeletalkListJob[]; totalCount: number; discoveryError: CrawlError | null }> {
+  let listed: TeletalkListJob[] = [];
+  let totalCount = 0;
+  let discoveryError: CrawlError | null = null;
+  const seenIds = new Set<number>();
+
+  try {
+    let page = 1;
+    const maxPages = mode === "full" ? FULL_CRAWL_MAX_PAGES : 5;
+
+    while (page <= maxPages) {
+      if (mode === "full" && (await isCancelled())) break;
+
+      const { govtJobs, count } = await fetchTeletalkJobList(page, TELETALK_PAGE_SIZE);
+      totalCount = count;
+
+      if (govtJobs.length === 0) break;
+
+      for (const job of govtJobs) {
+        if (seenIds.has(job.id)) continue;
+        seenIds.add(job.id);
+        listed.push(job);
+      }
+
+      if (mode === "quick" && listed.length >= limit) break;
+      if (mode === "full" && listed.length >= count) break;
+
+      page += 1;
+    }
+  } catch (error) {
+    discoveryError = {
+      url: `${API_BASE}/govt-jobs/list`,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+
+  if (mode === "quick") {
+    listed = listed.slice(0, limit);
+  }
+
+  return { listed, totalCount, discoveryError };
+}
+
 /**
  * Crawl government jobs directly from the Teletalk public API and enrich the
  * official Teletalk PDF with Mistral OCR when needed.
@@ -474,10 +561,25 @@ export function buildJobDescription({
  * cancellation: if the row's status becomes 'cancelled' mid-run, the loop
  * stops and partial progress is preserved.
  */
-export async function crawlGovernmentJobs(limit: number, triggeredBy?: string) {
+export async function crawlGovernmentJobs(
+  options: CrawlGovernmentJobsOptions | number,
+  legacyTriggeredBy?: string,
+) {
+  const opts: CrawlGovernmentJobsOptions =
+    typeof options === "number"
+      ? { limit: options, mode: "quick", triggeredBy: legacyTriggeredBy }
+      : { mode: "quick", ...options };
+
+  const mode = opts.mode ?? "quick";
+  const limit =
+    mode === "quick"
+      ? Math.min(QUICK_MAX_LIMIT, Math.max(1, opts.limit ?? QUICK_DEFAULT_LIMIT))
+      : Number.MAX_SAFE_INTEGER;
+  const triggeredBy = opts.triggeredBy ?? legacyTriggeredBy;
+
   const startedAt = new Date().toISOString();
   const errorList: CrawlError[] = [];
-  const maxOcr = Math.min(MAX_PDF_ENRICHMENTS_PER_RUN, Math.max(0, limit));
+  const maxOcr = MAX_PDF_ENRICHMENTS_PER_RUN;
   const hasMistralKey = !!process.env.MISTRAL_API_KEY;
   let ocrAttempts = 0;
   let enriched = 0;
@@ -489,7 +591,10 @@ export async function crawlGovernmentJobs(limit: number, triggeredBy?: string) {
     .insert({
       started_at: startedAt,
       status: "running",
-      progress_message: "Discovering circulars from Teletalk...",
+      progress_message:
+        mode === "full"
+          ? "Discovering all active jobs from Teletalk..."
+          : "Discovering circulars from Teletalk...",
       triggered_by: triggeredBy ?? null,
     })
     .select("id")
@@ -515,23 +620,25 @@ export async function crawlGovernmentJobs(limit: number, triggeredBy?: string) {
       .eq("id", runId);
   }
 
-  const pageSize = Math.min(20, Math.max(5, limit));
-  let listed: TeletalkListJob[] = [];
-  try {
-    let page = 1;
-    while (listed.length < limit * 2 && page <= 5) {
-      const { govtJobs, count } = await fetchTeletalkJobList(page, pageSize);
-      if (govtJobs.length === 0) break;
-      listed = listed.concat(govtJobs);
-      if (listed.length >= count) break;
-      page += 1;
-    }
-  } catch (error) {
-    errorList.push({
-      url: `${API_BASE}/govt-jobs/list`,
-      error: error instanceof Error ? error.message : String(error),
-    });
-  }
+  const { listed, totalCount, discoveryError } = await discoverTeletalkJobs({
+    mode,
+    limit,
+    isCancelled,
+  });
+  if (discoveryError) errorList.push(discoveryError);
+
+  console.log("[crawl] Teletalk list response", {
+    mode,
+    pageSize: TELETALK_PAGE_SIZE,
+    discovered: listed.length,
+    totalCount,
+    sample: listed.slice(0, 2).map((job) => ({
+      id: job.id,
+      job_id: job.job_id,
+      job_title: job.job_title,
+      organization: job.job_utilities_govtorganization?.name ?? null,
+    })),
+  });
 
   const { data: existing } = await supabaseAdmin
     .from("jobs")
@@ -544,13 +651,20 @@ export async function crawlGovernmentJobs(limit: number, triggeredBy?: string) {
       .map((row) => [row.external_job_id as string, row]),
   );
 
-  const candidates = listed.slice(0, limit);
+  const candidates = listed;
   const results: { url: string; ok: boolean; error?: string; enriched?: boolean }[] = [];
 
   await updateProgress({
     discovered: listed.length,
     attempted: 0,
-    progress_message: `Found ${listed.length} circulars. Processing 0 / ${candidates.length}...`,
+    progress_message: buildCrawlProgressMessage({
+      discovered: listed.length,
+      processed: 0,
+      total: candidates.length,
+      ocrAttempts,
+      enriched,
+      skippedEnrichment,
+    }),
   });
 
   let cancelled = false;
@@ -570,7 +684,14 @@ export async function crawlGovernmentJobs(limit: number, triggeredBy?: string) {
           attempted: results.length,
           succeeded: results.filter((r) => r.ok).length,
           failed: results.filter((r) => !r.ok).length,
-          progress_message: `Processed ${results.length} / ${candidates.length}`,
+          progress_message: buildCrawlProgressMessage({
+            discovered: listed.length,
+            processed: results.length,
+            total: candidates.length,
+            ocrAttempts,
+            enriched,
+            skippedEnrichment,
+          }),
         });
         continue;
       }
@@ -706,7 +827,14 @@ export async function crawlGovernmentJobs(limit: number, triggeredBy?: string) {
       attempted: results.length,
       succeeded: results.filter((r) => r.ok).length,
       failed: results.filter((r) => !r.ok).length,
-      progress_message: `Processed ${results.length} / ${candidates.length}`,
+      progress_message: buildCrawlProgressMessage({
+        discovered: listed.length,
+        processed: results.length,
+        total: candidates.length,
+        ocrAttempts,
+        enriched,
+        skippedEnrichment,
+      }),
     });
   }
 
@@ -718,6 +846,14 @@ export async function crawlGovernmentJobs(limit: number, triggeredBy?: string) {
   ];
 
   const finalStatus = cancelled ? "cancelled" : "completed";
+  const finalProgress = buildCrawlProgressMessage({
+    discovered: listed.length,
+    processed: results.length,
+    total: candidates.length,
+    ocrAttempts,
+    enriched,
+    skippedEnrichment,
+  });
   await updateProgress({
     status: finalStatus,
     finished_at: new Date().toISOString(),
@@ -730,6 +866,7 @@ export async function crawlGovernmentJobs(limit: number, triggeredBy?: string) {
       {
         url: "strategy",
         error: JSON.stringify({
+          mode,
           enriched,
           ocr_attempts: ocrAttempts,
           skipped_enrichment: skippedEnrichment,
@@ -737,14 +874,13 @@ export async function crawlGovernmentJobs(limit: number, triggeredBy?: string) {
         }),
       },
     ],
-    progress_message: cancelled
-      ? `Cancelled after ${results.length} of ${candidates.length} jobs`
-      : `Completed ${results.length} / ${candidates.length}`,
+    progress_message: cancelled ? `Cancelled · ${finalProgress}` : `Completed · ${finalProgress}`,
   });
 
   return {
     runId,
     status: finalStatus,
+    mode,
     discovered: listed.length,
     attempted: results.length,
     succeeded,
