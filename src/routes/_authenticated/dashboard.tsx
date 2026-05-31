@@ -445,3 +445,86 @@ function MatchCard({
     </>
   );
 }
+
+type CrawlRun = {
+  id: string;
+  started_at: string;
+  finished_at: string | null;
+  discovered: number;
+  attempted: number;
+  succeeded: number;
+  failed: number;
+  errors: { url: string; error: string }[] | null;
+};
+
+function CrawlStatusPanel({
+  run,
+  isLoading,
+  isRunning,
+}: {
+  run: CrawlRun | null;
+  isLoading: boolean;
+  isRunning: boolean;
+}) {
+  const errors = Array.isArray(run?.errors) ? run!.errors : [];
+  const lastRunLabel = run?.started_at
+    ? new Date(run.started_at).toLocaleString()
+    : isLoading
+      ? "Loading..."
+      : "Never";
+  const status = isRunning
+    ? { label: "Running...", tone: "warning" as const, Icon: Loader2, spin: true }
+    : run && errors.length === 0 && run.failed === 0
+      ? { label: "Healthy", tone: "success" as const, Icon: CheckCircle2, spin: false }
+      : run
+        ? { label: "Issues", tone: "warning" as const, Icon: AlertTriangle, spin: false }
+        : { label: "No runs yet", tone: "muted" as const, Icon: RefreshCw, spin: false };
+
+  const StatusIcon = status.Icon;
+  const toneClass =
+    status.tone === "success"
+      ? "text-success"
+      : status.tone === "warning"
+        ? "text-warning-foreground"
+        : "text-muted-foreground";
+
+  return (
+    <section className="rounded-2xl border bg-card p-5 shadow-sm sm:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-medium uppercase text-muted-foreground">Crawler status</p>
+          <h2 className="mt-1 text-lg font-semibold">Last run: {lastRunLabel}</h2>
+        </div>
+        <Badge variant="outline" className={`gap-2 ${toneClass}`}>
+          <StatusIcon className={`h-3.5 w-3.5 ${status.spin ? "animate-spin" : ""}`} />
+          {status.label}
+        </Badge>
+      </div>
+      <div className="mt-5 grid gap-3 sm:grid-cols-4">
+        <Metric label="URLs found" value={run?.discovered ?? 0} />
+        <Metric label="Scrape attempts" value={run?.attempted ?? 0} />
+        <Metric label="Saved" value={run?.succeeded ?? 0} tone="success" />
+        <Metric
+          label="Errors"
+          value={run?.failed ?? errors.length}
+          tone={errors.length > 0 || (run?.failed ?? 0) > 0 ? "warning" : undefined}
+        />
+      </div>
+      {errors.length > 0 && (
+        <div className="mt-5">
+          <p className="text-xs font-medium uppercase text-muted-foreground">
+            Errors ({errors.length})
+          </p>
+          <ul className="mt-2 max-h-48 space-y-2 overflow-auto rounded-lg border bg-background p-3 text-xs">
+            {errors.slice(0, 20).map((e, idx) => (
+              <li key={idx} className="space-y-1">
+                <p className="truncate font-mono text-muted-foreground">{e.url}</p>
+                <p className="text-warning-foreground">{e.error}</p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </section>
+  );
+}
