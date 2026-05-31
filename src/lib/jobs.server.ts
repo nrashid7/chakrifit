@@ -67,7 +67,9 @@ async function firecrawlWithFallback<T>(fn: (client: Firecrawl) => Promise<T>): 
   throw lastError instanceof Error ? lastError : new Error(String(lastError));
 }
 
-export async function crawlGovernmentJobs(limit: number) {
+export async function crawlGovernmentJobs(limit: number, triggeredBy?: string) {
+  const startedAt = new Date().toISOString();
+  const mapErrors: { url: string; error: string }[] = [];
   if (getFirecrawlKeys().length === 0) throw new Error("Firecrawl is not connected");
 
   let urls: string[] = [];
