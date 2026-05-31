@@ -11,9 +11,11 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import {
+  AlertTriangle,
   ArrowRight,
   BookmarkPlus,
   CalendarClock,
+  CheckCircle2,
   ExternalLink,
   FileWarning,
   Loader2,
