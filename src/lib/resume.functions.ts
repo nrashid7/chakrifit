@@ -1,37 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { generateText, Output } from "ai";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { createLovableAiGatewayProvider, requireLovableApiKey } from "./ai-gateway.server";
+import { parseResumeTextWithAi } from "./resume.server";
+import { SaveProfileSchema, type ParsedResumeData } from "./resume.schemas";
 
-const ResumeSchema = z.object({
-  full_name: z.string().nullable().optional(),
-  dob: z.string().nullable().optional().describe("YYYY-MM-DD if known"),
-  age: z.number().nullable().optional(),
-  location: z.string().nullable().optional(),
-  skills: z.array(z.string()).default([]),
-  education: z
-    .array(
-      z.object({
-        degree: z.string().nullable().optional(),
-        subject: z.string().nullable().optional(),
-        institution: z.string().nullable().optional(),
-        graduation_year: z.number().nullable().optional(),
-      }),
-    )
-    .default([]),
-  experience: z
-    .array(
-      z.object({
-        title: z.string().nullable().optional(),
-        company: z.string().nullable().optional(),
-        years: z.number().nullable().optional(),
-      }),
-    )
-    .default([]),
-});
-
-export type ParsedResumeData = z.infer<typeof ResumeSchema>;
+export type { ParsedResumeData };
 
 export const parseResumeText = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -39,58 +12,12 @@ export const parseResumeText = createServerFn({ method: "POST" })
     z.object({ text: z.string().min(20).max(50000) }).parse(input),
   )
   .handler(async ({ data }) => {
-    const gateway = createLovableAiGatewayProvider(requireLovableApiKey());
-    const model = gateway("google/gemini-3-flash-preview");
-
-    const { output } = await generateText({
-      model,
-      output: Output.object({ schema: ResumeSchema }),
-      system:
-        "You extract structured profile data from resumes for a Bangladesh government job matching platform. " +
-        "Handle both English and Bangla content. For degrees, use simple labels like 'Bachelor', 'Master', 'Diploma', 'HSC', 'SSC'. " +
-        "For dob use YYYY-MM-DD only if explicitly stated. Compute age from dob if possible. " +
-        "Return clean lowercase subject names. Years of experience: sum of full-time roles in years (decimals OK).",
-      prompt: `Extract structured data from this resume:\n\n${data.text}`,
-    });
-
-    return output;
+    return parseResumeTextWithAi(data.text);
   });
 
 export const saveProfile = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
-    z
-      .object({
-        full_name: z.string().nullable().optional(),
-        dob: z.string().nullable().optional(),
-        age: z.number().nullable().optional(),
-        location: z.string().nullable().optional(),
-        skills: z.array(z.string()).default([]),
-        resume_path: z.string().nullable().optional(),
-        extracted_resume_text: z.string().nullable().optional(),
-        parsed_json: z.unknown().optional(),
-        education: z
-          .array(
-            z.object({
-              degree: z.string().nullable().optional(),
-              subject: z.string().nullable().optional(),
-              institution: z.string().nullable().optional(),
-              graduation_year: z.number().nullable().optional(),
-            }),
-          )
-          .default([]),
-        experience: z
-          .array(
-            z.object({
-              title: z.string().nullable().optional(),
-              company: z.string().nullable().optional(),
-              years: z.number().nullable().optional(),
-            }),
-          )
-          .default([]),
-      })
-      .parse(input),
-  )
+  .inputValidator((input: unknown) => SaveProfileSchema.parse(input))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
 

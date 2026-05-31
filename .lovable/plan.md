@@ -1,64 +1,41 @@
-# ChakriFit MVP Plan
+## What I found
 
-A focused AI eligibility matcher for Bangladesh government jobs. Upload CV → see which Teletalk jobs you qualify for, with AI explanations.
+The publish failures are most likely from build/runtime boundary issues, not the UI itself:
 
-## Stack
+1. **Server function split risk**
+   - `resume.functions.ts`, `jobs.functions.ts`, and `matches.functions.ts` contain schemas/helpers in the same files as `createServerFn` handlers.
+   - TanStack Start production builds can fail on `?tss-serverfn-split` when server function files have sibling declarations or server-only imports that are not isolated.
 
-- TanStack Start + React + Tailwind + shadcn/ui
-- Lovable Cloud (auth, Postgres, storage)
-- Lovable AI (Gemini) for resume + circular parsing and match explanations
-- Firecrawl connector for crawling `alljobs.teletalk.com.bd/jobs/government`
+2. **Server-only imports reachable from client graph**
+   - `jobs.functions.ts` imports the admin backend client at module scope.
+   - Even if it is inside a server function file, production splitting can still be strict about import graphs.
 
-## Pages
+3. **Missing router-level fallback**
+   - `src/router.tsx` does not set `defaultErrorComponent`, which can hide or worsen deployment/runtime failures.
 
-Public: Landing, Login/Signup, Privacy, Terms
-Authenticated: Dashboard (matches), Profile, Saved Jobs, Job Detail, Settings
+4. **Package/dependency state has recently changed**
+   - The AI SDK dependencies are now present, but publishing may still be failing because the server-function structure needs cleanup.
 
-## Design
+## Fix plan
 
-Mobile-first, white background, subtle green accents (Bangladesh-flag inspired), soft shadows, generous spacing, no enterprise dashboard clutter. Inter for body, slightly heavier display font for headings.
+1. **Refactor server function files into thin wrappers**
+   - Move Zod schemas, helper types, and helper functions out of `*.functions.ts` into normal shared modules or `*.server.ts` files.
+   - Keep `*.functions.ts` files mostly limited to imports plus `createServerFn(...).inputValidator(...).handler(...)` declarations.
 
-## Database (Lovable Cloud)
+2. **Isolate server-only backend/admin logic**
+   - Move admin database reads/writes and Firecrawl parsing helpers from `jobs.functions.ts` into a `jobs.server.ts` helper.
+   - Keep secrets (`FIRECRAWL_API_KEY`, `LOVABLE_API_KEY`) read only inside server execution paths.
 
-- `profiles` — user_id, full_name, dob, age, location, extracted_resume_text, parsed_json, resume_path
-- `education` — profile_id, degree, subject, institution, graduation_year
-- `experience` — profile_id, title, company, years
-- `jobs` — external_job_id (unique), title, organization, deadline, salary, age_limit (jsonb), education_requirements (jsonb), experience_requirements (jsonb), circular_url, parsed_json, source_url
-- `matches` — user_id, job_id, score, eligibility_status (eligible|partial|not_eligible), explanation
-- `saved_jobs` — user_id, job_id, applied (bool)
+3. **Clean up AI parsing helpers**
+   - Move resume/job structured-output schemas to shared schema files if they are safe, or server helper files if only server-side.
+   - Import them into handlers in a way that does not confuse TanStack’s server-function splitter.
 
-RLS: every table scoped to `auth.uid()`; `jobs` readable by all authenticated users. Storage bucket `resumes` private with signed URLs.
+4. **Add router fallback error handling**
+   - Add a `defaultErrorComponent` to `src/router.tsx` so production failures show a controlled error screen and log properly.
 
-## Core flows
+5. **Check browser-only resume extraction boundary**
+   - Verify `resume-extract.ts` remains dynamically imported only from the profile upload handler and is not pulled into SSR.
 
-### 1. Resume upload + parsing
-- Upload PDF/DOCX to private storage
-- Server function extracts text (pdf-parse / mammoth), then Lovable AI returns structured JSON (name, dob, age, education[], experience[], skills, location)
-- User reviews + edits extracted profile before saving
-
-### 2. Job crawler (Firecrawl)
-- Connect Firecrawl connector
-- Server function `crawlJobs`: `firecrawl.map` the Teletalk govt jobs index → for each circular URL not in DB, `firecrawl.scrape` markdown → Lovable AI extracts structured requirements JSON (max_age, required_degrees[], required_subjects[], min_experience_years, quota, deadline, salary_grade) → upsert into `jobs`
-- Triggered manually from an admin button in MVP + a public cron endpoint at `/api/public/cron/crawl-jobs` (header-secret protected) for future scheduling
-- Seed 5–10 sample circulars on first run so dashboard isn't empty
-
-### 3. Eligibility engine (deterministic)
-- Server function `computeMatches(userId)`:
-  - For each job, score 0–100 from: degree match (35), subject match (20), age (20), experience (15), skills (10)
-  - Bucket: ≥70 eligible, 40–69 partial, <40 not eligible
-  - Hard fails (over age limit, missing required degree) cap score
-- Store rows in `matches`
-
-### 4. Match explanation (AI)
-- On-demand when user opens "Why I Match" modal
-- Lovable AI receives compact profile + job requirements + computed score breakdown → returns short bullet list of why qualify / why not
-- Cached in `matches.explanation`
-
-### 5. Saved jobs + applied marking
-- Standard CRUD on `saved_jobs`
-
-## Out of MVP
-Email notifications, resume builder, applications, recruiter side, payments, admin CRM, WhatsApp/SMS, exam prep.
-
-## What I'll need from you
-- Confirm the plan, then I'll: enable Lovable Cloud, connect Firecrawl, build the schema + pages + server functions, seed sample jobs, and ship the end-to-end flow.
+6. **Final verification**
+   - After implementation, rely on the automatic build/typecheck harness and inspect the preview/server logs for any remaining publish blockers.
+   - If another production-only error remains, use the exact new error path to narrow it down rather than guessing.
