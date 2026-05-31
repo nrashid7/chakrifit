@@ -63,7 +63,7 @@ function ProfilePage() {
     setParsing(true);
     try {
       // 1. Extract text in browser (dynamic import keeps pdfjs/mammoth out of SSR bundle)
-      const { extractResumeText } = await import("@/lib/resume-extract");
+      const { extractResumeText } = await import("../../lib/resume-extract");
       const text = await extractResumeText(file);
       if (text.length < 50) throw new Error("Could not read resume text. Try a different file.");
       setExtractedText(text);
