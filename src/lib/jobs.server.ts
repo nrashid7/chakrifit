@@ -509,7 +509,7 @@ export async function crawlGovernmentJobs(limit: number, triggeredBy?: string) {
           experience_requirements: experienceReq,
           circular_url: circularUrl,
           source_url: detail.application_site || detail.job_source || circularUrl,
-          parsed_json: parsedJson as unknown as Record<string, unknown>,
+          parsed_json: JSON.parse(JSON.stringify(parsedJson)),
         },
         { onConflict: "external_job_id" },
       );
