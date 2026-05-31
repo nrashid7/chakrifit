@@ -59,6 +59,7 @@ function Dashboard() {
   const explainFn = useServerFn(explainMatch);
   const adminFn = useServerFn(amIAdmin);
   const latestRunFn = useServerFn(latestCrawlRun);
+  const cancelFn = useServerFn(cancelCrawlRun);
 
   const profile = useQuery({ queryKey: ["profile"], queryFn: () => profileFn() });
   const matches = useQuery({ queryKey: ["matches"], queryFn: () => matchesFn() });
@@ -68,6 +69,10 @@ function Dashboard() {
     queryKey: ["latest-crawl-run"],
     queryFn: () => latestRunFn(),
     enabled: isAdmin,
+    refetchInterval: (q) => {
+      const status = (q.state.data?.run as CrawlRun | null)?.status;
+      return status === "running" || status === "queued" ? 2000 : false;
+    },
   });
 
   useEffect(() => {
