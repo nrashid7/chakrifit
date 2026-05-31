@@ -62,7 +62,9 @@ function JobDetail() {
     education_requirements: { required_degrees?: string[]; required_subjects?: string[] } | null;
     experience_requirements: { min_experience_years?: number | null; preferred_skills?: string[] } | null;
   };
-  const myMatch = matches.data?.matches?.find((m: { job_id: string }) => m.job_id === jobId);
+  const myMatch = matches.data?.matches?.find((m: { job_id: string }) => m.job_id === jobId) as
+    | { id: string; score: number; eligibility_status: string; explanation: string | null; reasons: { positives?: string[]; negatives?: string[] } | null }
+    | undefined;
   const isSaved = !!saved.data?.saved?.find((s: { job_id: string }) => s.job_id === jobId);
 
   async function handleSave() {
