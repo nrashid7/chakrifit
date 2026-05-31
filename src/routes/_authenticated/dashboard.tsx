@@ -487,10 +487,15 @@ function RequirementsBadge({ status }: { status: RequirementsStatus }) {
   return <Badge variant="outline">Verify circular</Badge>;
 }
 
+type CrawlStatus = "queued" | "running" | "completed" | "cancelled" | "failed";
+
 type CrawlRun = {
   id: string;
   started_at: string;
   finished_at: string | null;
+  updated_at: string | null;
+  status: CrawlStatus;
+  progress_message: string | null;
   discovered: number;
   attempted: number;
   succeeded: number;
