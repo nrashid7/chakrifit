@@ -7,7 +7,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { BriefcaseBusiness, LockKeyhole, Mail, ShieldCheck } from "lucide-react";
+import {
+  BriefcaseBusiness,
+  CheckCircle2,
+  LockKeyhole,
+  Mail,
+  ShieldCheck,
+  Sparkles,
+} from "lucide-react";
 import { LanguageToggle } from "@/components/language-toggle";
 import { useT } from "@/i18n";
 
@@ -59,29 +66,35 @@ function LoginPage() {
   }
 
   return (
-    <div className="grid min-h-dvh lg:grid-cols-[1fr_430px]">
-      <section className="hidden bg-primary p-10 text-primary-foreground lg:flex lg:flex-col lg:justify-between">
+    <div className="grid min-h-dvh bg-background lg:grid-cols-[minmax(0,1fr)_440px]">
+      <section className="hidden overflow-hidden bg-primary p-10 text-primary-foreground lg:flex lg:flex-col lg:justify-between">
         <Link to="/" className="flex items-center gap-3 font-display text-xl font-bold">
-          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-foreground text-primary">
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-foreground text-primary shadow-sm">
             <BriefcaseBusiness className="h-5 w-5" />
           </span>
           ChakriFit
         </Link>
-        <div>
-          <p className="text-sm font-semibold uppercase text-primary-foreground/70">
+        <div className="relative">
+          <div className="absolute -right-24 -top-20 h-72 w-72 rounded-full bg-primary-foreground/10 blur-3xl" />
+          <p className="flex items-center gap-2 text-sm font-semibold text-primary-foreground/75">
+            <Sparkles className="h-4 w-4" />
             {t("login.heroBadge")}
           </p>
-          <h1 className="mt-3 max-w-xl text-5xl font-bold leading-tight">{t("login.heroTitle")}</h1>
-          <div className="mt-8 grid gap-3 text-sm text-primary-foreground/80">
-            <span className="flex items-center gap-2">
-              <ShieldCheck className="h-4 w-4" /> {t("login.heroPrivate")}
-            </span>
-            <span className="flex items-center gap-2">
-              <LockKeyhole className="h-4 w-4" /> {t("login.heroRls")}
-            </span>
-            <span className="flex items-center gap-2">
-              <Mail className="h-4 w-4" /> {t("login.heroEmailGoogle")}
-            </span>
+          <h1 className="mt-4 max-w-2xl text-balance text-5xl font-bold leading-tight">
+            {t("login.heroTitle")}
+          </h1>
+          <div className="mt-10 max-w-xl rounded-xl border border-primary-foreground/18 bg-primary-foreground/8 p-4">
+            <div className="grid gap-3 text-sm text-primary-foreground/85">
+              <span className="flex items-center gap-2">
+                <ShieldCheck className="h-4 w-4" /> {t("login.heroPrivate")}
+              </span>
+              <span className="flex items-center gap-2">
+                <LockKeyhole className="h-4 w-4" /> {t("login.heroRls")}
+              </span>
+              <span className="flex items-center gap-2">
+                <Mail className="h-4 w-4" /> {t("login.heroEmailGoogle")}
+              </span>
+            </div>
           </div>
         </div>
         <p className="text-xs text-primary-foreground/70">{t("login.heroDisclaimer")}</p>
@@ -102,8 +115,12 @@ function LoginPage() {
             ChakriFit
           </Link>
 
-          <div className="rounded-2xl border bg-card p-6 shadow-xl shadow-primary/10">
+          <div className="rounded-xl border bg-card/95 p-6 shadow-xl shadow-primary/10">
             <div className="mb-5">
+              <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-secondary px-3 py-1 text-xs font-semibold text-primary">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                {t("login.heroBadge")}
+              </div>
               <h1 className="text-2xl font-bold">{t("login.welcomeBack")}</h1>
               <p className="mt-1 text-sm text-muted-foreground">{t("login.subtitle")}</p>
             </div>
@@ -134,7 +151,7 @@ function LoginPage() {
                       required
                     />
                   </div>
-                  <Button type="submit" className="w-full" disabled={loading}>
+                  <Button type="submit" className="mt-1 w-full" disabled={loading}>
                     {t("login.logIn")}
                   </Button>
                 </form>
@@ -161,7 +178,7 @@ function LoginPage() {
                       minLength={6}
                     />
                   </div>
-                  <Button type="submit" className="w-full" disabled={loading}>
+                  <Button type="submit" className="mt-1 w-full" disabled={loading}>
                     {t("login.createAccount")}
                   </Button>
                 </form>
@@ -172,7 +189,7 @@ function LoginPage() {
               <div className="h-px flex-1 bg-border" /> {t("login.or")}{" "}
               <div className="h-px flex-1 bg-border" />
             </div>
-            <Button variant="outline" className="w-full" onClick={handleGoogle}>
+            <Button variant="outline" className="w-full bg-background/80" onClick={handleGoogle}>
               {t("login.continueGoogle")}
             </Button>
           </div>

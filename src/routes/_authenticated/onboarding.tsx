@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { PageHeader, Surface } from "@/components/app-ui";
 import { toast } from "sonner";
 import {
   BriefcaseBusiness,
@@ -168,18 +169,17 @@ function Onboarding() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-8">
-      <div className="rounded-2xl border bg-card p-6 shadow-sm">
-        <p className="text-sm font-semibold uppercase text-primary">{t("onboard.badge")}</p>
-        <h1 className="mt-2 text-3xl font-bold">{t("onboard.title")}</h1>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-          {t("onboard.subtitle")}
-        </p>
-      </div>
+      <PageHeader
+        eyebrow={t("onboard.badge")}
+        icon={Sparkles}
+        title={t("onboard.title")}
+        description={t("onboard.subtitle")}
+      />
 
       <Stepper step={step} t={t} />
 
       {step === 1 && (
-        <label className="block cursor-pointer rounded-2xl border-2 border-dashed border-primary/30 bg-card p-10 text-center shadow-sm transition hover:bg-accent/40">
+        <label className="block cursor-pointer rounded-xl border-2 border-dashed border-primary/30 bg-card/92 p-10 text-center shadow-sm shadow-primary/5 transition hover:border-primary/50 hover:bg-accent/40">
           <input
             type="file"
             accept=".pdf,.docx,.txt"
@@ -201,7 +201,7 @@ function Onboarding() {
       {step === 4 && <Processing title={t("onboard.matching")} body={t("onboard.matchingHint")} />}
 
       {step === 3 && (
-        <div className="space-y-5 rounded-2xl border bg-card p-5 shadow-sm sm:p-6">
+        <div className="space-y-5 rounded-xl border bg-card/92 p-5 shadow-sm shadow-primary/5 sm:p-6">
           <div>
             <h2 className="text-xl font-semibold">{t("onboard.reviewTitle")}</h2>
             <p className="text-sm text-muted-foreground">{t("onboard.reviewHint")}</p>
@@ -404,7 +404,7 @@ function Onboarding() {
 
 function Processing({ title, body }: { title: string; body: string }) {
   return (
-    <div className="rounded-2xl border bg-card p-10 text-center shadow-sm">
+    <div className="rounded-xl border bg-card/92 p-10 text-center shadow-sm shadow-primary/5">
       <Loader2 className="mx-auto h-6 w-6 animate-spin text-primary" />
       <p className="mt-3 font-medium">{title}</p>
       <p className="mt-1 text-xs text-muted-foreground">{body}</p>
@@ -414,13 +414,13 @@ function Processing({ title, body }: { title: string; body: string }) {
 
 function Panel({ title, icon, children }: { title: string; icon: ReactNode; children: ReactNode }) {
   return (
-    <section className="rounded-xl border bg-background p-4">
+    <Surface className="bg-background/72 p-4">
       <div className="mb-4 flex items-center gap-2 font-medium">
         {icon}
         {title}
       </div>
       {children}
-    </section>
+    </Surface>
   );
 }
 
@@ -432,7 +432,7 @@ function Stepper({ step, t }: { step: number; t: ReturnType<typeof useT> }) {
     { n: 4, label: t("onboard.step.match") },
   ];
   return (
-    <ol className="flex flex-wrap items-center gap-2 rounded-2xl border bg-card p-3 text-xs shadow-sm">
+    <ol className="flex flex-wrap items-center gap-2 rounded-xl border bg-card/92 p-3 text-xs shadow-sm shadow-primary/5">
       {items.map((it, i) => {
         const done = step > it.n;
         const active = step === it.n;

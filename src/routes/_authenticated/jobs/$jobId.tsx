@@ -8,6 +8,7 @@ import { reparsePdf } from "@/lib/reparse.functions";
 import { toggleSave, listSaved } from "@/lib/saved.functions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { PageHeader, Surface } from "@/components/app-ui";
 import { toast } from "sonner";
 import { useT, eligibilityLabel } from "@/i18n";
 import {
@@ -153,7 +154,24 @@ function JobDetail() {
         <ArrowLeft className="mr-1 h-3 w-3" /> {t("common.backToDashboard")}
       </Link>
 
-      <section className="rounded-2xl border bg-card p-6 shadow-sm">
+      <PageHeader
+        title={j.title}
+        description={statusNote(requirementsStatus, t)}
+        actions={
+          myMatch && (
+            <div className="rounded-xl border bg-background/80 p-4 text-center shadow-sm">
+              <p className="text-xs font-semibold text-muted-foreground">{t("common.yourScore")}</p>
+              <div
+                className={`mt-2 text-5xl font-bold tabular-nums ${myMatch.eligibility_status === "eligible" ? "text-success" : myMatch.eligibility_status === "partial" ? "text-warning-foreground" : "text-muted-foreground"}`}
+              >
+                {myMatch.score}%
+              </div>
+            </div>
+          )
+        }
+      />
+
+      <Surface>
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_180px]">
           <div className="min-w-0">
             <div className="flex flex-wrap gap-2">
@@ -171,28 +189,12 @@ function JobDetail() {
               {j.salary && <Badge variant="outline">{j.salary}</Badge>}
               <RequirementsBadge status={requirementsStatus} t={t} />
             </div>
-            <h1 className="mt-4 text-3xl font-bold leading-tight">{j.title}</h1>
             <p className="mt-2 text-muted-foreground">
               {j.organization ?? t("common.bangladeshGov")}
             </p>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
-              {statusNote(requirementsStatus, t)}
-            </p>
           </div>
-          {myMatch && (
-            <div className="rounded-xl border bg-background p-4 text-center">
-              <p className="text-xs font-medium uppercase text-muted-foreground">
-                {t("common.yourScore")}
-              </p>
-              <div
-                className={`mt-2 text-5xl font-bold tabular-nums ${myMatch.eligibility_status === "eligible" ? "text-success" : myMatch.eligibility_status === "partial" ? "text-warning-foreground" : "text-muted-foreground"}`}
-              >
-                {myMatch.score}%
-              </div>
-            </div>
-          )}
         </div>
-        <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+        <div className="mt-5 flex flex-col gap-2 border-t pt-5 sm:flex-row sm:flex-wrap">
           {j.circular_url && (
             <a href={j.circular_url} target="_blank" rel="noreferrer">
               <Button className="w-full sm:w-auto">
@@ -220,7 +222,7 @@ function JobDetail() {
             </Button>
           )}
         </div>
-      </section>
+      </Surface>
 
       <div className="grid gap-4 md:grid-cols-3">
         <Field icon={<Timer className="h-4 w-4 text-primary" />} label={t("job.ageRequirement")}>
@@ -354,7 +356,7 @@ function JobDetail() {
       )}
 
       {myMatch && (
-        <section className="rounded-2xl border bg-card p-6 shadow-sm">
+        <section className="rounded-xl border bg-card/92 p-6 shadow-sm shadow-primary/5">
           <h2 className="font-semibold">
             {t("job.matchExplanation", {
               status: eligibilityLabel(myMatch.eligibility_status, t).toLowerCase(),
@@ -443,7 +445,7 @@ function RequirementsBadge({
 
 function Field({ label, icon, children }: { label: string; icon: ReactNode; children: ReactNode }) {
   return (
-    <section className="rounded-2xl border bg-card p-5 shadow-sm">
+    <section className="rounded-xl border bg-card/92 p-5 shadow-sm shadow-primary/5">
       <div className="flex items-center gap-2 text-xs font-semibold uppercase text-muted-foreground">
         {icon}
         {label}
@@ -463,7 +465,7 @@ function SectionCard({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border bg-card p-5 shadow-sm sm:p-6">
+    <section className="rounded-xl border bg-card/92 p-5 shadow-sm shadow-primary/5 sm:p-6">
       <div className="mb-4 flex items-center gap-2 text-sm font-semibold">
         {icon}
         {title}

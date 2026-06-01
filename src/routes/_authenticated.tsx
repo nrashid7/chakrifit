@@ -1,4 +1,11 @@
-import { createFileRoute, Outlet, redirect, Link, useNavigate } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  Outlet,
+  redirect,
+  Link,
+  useNavigate,
+  useRouterState,
+} from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { SiteHeader } from "@/components/site-chrome";
 import { Button } from "@/components/ui/button";
@@ -23,41 +30,51 @@ export const Route = createFileRoute("/_authenticated")({
 function AuthedLayout() {
   const navigate = useNavigate();
   const t = useT();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
   async function signOut() {
     await supabase.auth.signOut();
     navigate({ to: "/", replace: true });
   }
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="flex min-h-screen flex-col">
       <SiteHeader
         right={
           <>
             <Link to="/dashboard">
-              <Button variant="ghost" size="sm">
+              <Button variant={pathname === "/dashboard" ? "secondary" : "ghost"} size="sm">
                 <LayoutDashboard className="h-4 w-4" />
                 <span className="hidden sm:inline">{t("nav.dashboard")}</span>
               </Button>
             </Link>
             <Link to="/jobs">
-              <Button variant="ghost" size="sm">
+              <Button variant={pathname.startsWith("/jobs") ? "secondary" : "ghost"} size="sm">
                 <BriefcaseBusiness className="h-4 w-4" />
                 <span className="hidden sm:inline">{t("nav.browseJobs")}</span>
               </Button>
             </Link>
             <Link to="/profile">
-              <Button variant="ghost" size="sm">
+              <Button
+                variant={
+                  pathname === "/profile" || pathname === "/onboarding" ? "secondary" : "ghost"
+                }
+                size="sm"
+              >
                 <UserRound className="h-4 w-4" />
                 <span className="hidden sm:inline">{t("nav.profile")}</span>
               </Button>
             </Link>
             <Link to="/saved">
-              <Button variant="ghost" size="sm">
+              <Button variant={pathname === "/saved" ? "secondary" : "ghost"} size="sm">
                 <Bookmark className="h-4 w-4" />
                 <span className="hidden sm:inline">{t("nav.saved")}</span>
               </Button>
             </Link>
             <Link to="/settings">
-              <Button variant="ghost" size="sm" aria-label={t("nav.settings")}>
+              <Button
+                variant={pathname === "/settings" ? "secondary" : "ghost"}
+                size="sm"
+                aria-label={t("nav.settings")}
+              >
                 <SettingsIcon className="h-4 w-4" />
               </Button>
             </Link>
@@ -67,7 +84,7 @@ function AuthedLayout() {
           </>
         }
       />
-      <main className="flex-1 mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:py-8">
+      <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 lg:py-8">
         <Outlet />
       </main>
     </div>

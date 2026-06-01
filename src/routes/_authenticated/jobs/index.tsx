@@ -8,6 +8,7 @@ import { listSaved, toggleSave } from "@/lib/saved.functions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { EmptyState, PageHeader, Surface } from "@/components/app-ui";
 import {
   Select,
   SelectContent,
@@ -144,12 +145,9 @@ function JobsBrowser() {
 
   return (
     <div className="space-y-6">
-      <header className="rounded-2xl border bg-card p-5 shadow-sm sm:p-6">
-        <h1 className="text-3xl font-bold">{t("jobs.title")}</h1>
-        <p className="mt-2 max-w-2xl text-sm text-muted-foreground">{t("jobs.subtitle")}</p>
-      </header>
+      <PageHeader title={t("jobs.title")} description={t("jobs.subtitle")} icon={Search} />
 
-      <section className="rounded-2xl border bg-card p-4 shadow-sm sm:p-5">
+      <Surface>
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -186,7 +184,7 @@ function JobsBrowser() {
             <TabsTrigger value="deadline_soon">{t("jobs.filter.deadlineSoon")}</TabsTrigger>
           </TabsList>
         </Tabs>
-      </section>
+      </Surface>
 
       {jobs.isLoading ? (
         <div className="py-16 text-center text-muted-foreground">
@@ -194,18 +192,16 @@ function JobsBrowser() {
           <p className="mt-3 text-sm">{t("jobs.loading")}</p>
         </div>
       ) : visible.length === 0 ? (
-        <div className="rounded-2xl border bg-card p-10 text-center text-sm text-muted-foreground">
-          {t("jobs.noResults")}
-        </div>
+        <EmptyState title={t("jobs.noResults")} description={t("jobs.subtitle")} icon={Search} />
       ) : (
-        <div className="grid gap-3">
+        <div className="overflow-hidden rounded-xl border bg-card/92 shadow-sm shadow-primary/5">
           {visible.map((j) => {
             const m = matchByJob.get(j.id);
             const isSaved = savedSet.has(j.id);
             return (
               <article
                 key={j.id}
-                className="rounded-xl border bg-card p-4 shadow-sm transition hover:border-primary/35 hover:shadow-md sm:p-5"
+                className="border-b p-4 transition last:border-b-0 hover:bg-accent/35 sm:p-5"
               >
                 <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_180px]">
                   <div className="min-w-0">
