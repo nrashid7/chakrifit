@@ -4,9 +4,10 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { listSaved, toggleSave, setApplied } from "@/lib/saved.functions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { EmptyState, PageHeader } from "@/components/app-ui";
 import { toast } from "sonner";
 import { useT } from "@/i18n";
-import { CheckCircle2, ExternalLink, Trash2 } from "lucide-react";
+import { BookmarkCheck, CheckCircle2, ExternalLink, Trash2 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/saved")({
   head: () => ({ meta: [{ title: "Saved jobs | ChakriFit" }] }),
@@ -27,24 +28,28 @@ function SavedPage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <div className="rounded-2xl border bg-card p-6 shadow-sm">
-        <p className="text-sm font-semibold uppercase text-primary">{t("saved.badge")}</p>
-        <h1 className="mt-2 text-3xl font-bold">{t("saved.title")}</h1>
-        <p className="mt-2 text-sm text-muted-foreground">{t("saved.subtitle")}</p>
-      </div>
+      <PageHeader
+        eyebrow={t("saved.badge")}
+        icon={BookmarkCheck}
+        title={t("saved.title")}
+        description={t("saved.subtitle")}
+      />
 
       {saved.length === 0 ? (
-        <div className="rounded-2xl border bg-card p-8 text-center shadow-sm">
-          <h2 className="text-xl font-semibold">{t("saved.empty")}</h2>
-          <p className="mt-2 text-sm text-muted-foreground">{t("saved.emptyHint")}</p>
-          <Link to="/dashboard" className="mt-5 inline-block">
-            <Button>{t("saved.viewMatches")}</Button>
-          </Link>
-        </div>
+        <EmptyState
+          title={t("saved.empty")}
+          description={t("saved.emptyHint")}
+          icon={BookmarkCheck}
+          action={
+            <Link to="/dashboard">
+              <Button>{t("saved.viewMatches")}</Button>
+            </Link>
+          }
+        />
       ) : (
-        <div className="grid gap-3">
+        <div className="overflow-hidden rounded-xl border bg-card/92 shadow-sm shadow-primary/5">
           {saved.map((s) => (
-            <article key={s.id} className="rounded-xl border bg-card p-4 shadow-sm">
+            <article key={s.id} className="border-b p-4 last:border-b-0">
               <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div className="min-w-0">
                   <div className="flex flex-wrap gap-2">

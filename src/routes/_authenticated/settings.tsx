@@ -6,6 +6,7 @@ import { deleteResume, deleteAccount } from "@/lib/resume.functions";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { PageHeader, Surface } from "@/components/app-ui";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -70,11 +71,12 @@ function Settings() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      <div className="rounded-2xl border bg-card p-6 shadow-sm">
-        <p className="text-sm font-semibold uppercase text-primary">{t("settings.badge")}</p>
-        <h1 className="mt-2 text-3xl font-bold">{t("settings.title")}</h1>
-        <p className="mt-2 text-sm text-muted-foreground">{t("settings.subtitle")}</p>
-      </div>
+      <PageHeader
+        eyebrow={t("settings.badge")}
+        icon={ShieldCheck}
+        title={t("settings.title")}
+        description={t("settings.subtitle")}
+      />
 
       <Card title={t("settings.account")} icon={<Mail className="h-4 w-4 text-primary" />}>
         <Row icon={<Mail className="h-4 w-4 text-muted-foreground" />} label={t("settings.email")}>
@@ -145,13 +147,13 @@ function Settings() {
 
 function Card({ title, icon, children }: { title: string; icon: ReactNode; children: ReactNode }) {
   return (
-    <section className="rounded-2xl border bg-card p-5 shadow-sm">
+    <Surface>
       <h2 className="mb-3 flex items-center gap-2 font-semibold">
         {icon}
         {title}
       </h2>
       <div className="space-y-3">{children}</div>
-    </section>
+    </Surface>
   );
 }
 

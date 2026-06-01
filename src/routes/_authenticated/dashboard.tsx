@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { EmptyState, MetricTile, PageHeader, Surface } from "@/components/app-ui";
 import { toast } from "sonner";
 import {
   AlertTriangle,
@@ -127,84 +128,80 @@ function Dashboard() {
   const partial = all.filter((m) => m.eligibility_status === "partial");
   const bestScore = all.length ? Math.max(...all.map((m) => m.score)) : 0;
 
+  const headerActions = (
+    <div className="flex flex-col gap-3 lg:items-end">
+      <div className="flex flex-col gap-2 sm:flex-row">
+        {isAdmin && (
+          <>
+            <Button
+              variant="outline"
+              onClick={() => crawl.mutate({ mode: "quick", limit: 8 })}
+              disabled={crawl.isPending || isRunning}
+            >
+              {crawl.isPending || isRunning ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              {t("dash.quickFetch")}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => crawl.mutate({ mode: "full" })}
+              disabled={crawl.isPending || isRunning}
+            >
+              {crawl.isPending || isRunning ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              {t("dash.fullSync")}
+            </Button>
+            {isRunning && runRow && (
+              <Button
+                variant="ghost"
+                onClick={() => cancel.mutate(runRow.id)}
+                disabled={cancel.isPending}
+              >
+                {t("common.cancel")}
+              </Button>
+            )}
+          </>
+        )}
+        <Button onClick={() => compute.mutate()} disabled={compute.isPending}>
+          {compute.isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Sparkles className="h-4 w-4" />
+          )}
+          {t("dash.recompute")}
+        </Button>
+      </div>
+      {isAdmin && (
+        <p className="text-xs text-muted-foreground lg:max-w-md lg:text-right">
+          {t("dash.fullSyncHint")}
+        </p>
+      )}
+    </div>
+  );
+
   return (
     <div className="space-y-8">
-      <section className="rounded-2xl border bg-card p-5 shadow-sm sm:p-6">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <Badge variant="secondary" className="gap-2 rounded-full">
-              <SearchCheck className="h-3.5 w-3.5 text-primary" />
-              {t("dash.badge")}
-            </Badge>
-            <h1 className="mt-3 text-3xl font-bold">{t("dash.title")}</h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-              {all.length
-                ? t("dash.subtitleScored", { count: all.length })
-                : t("dash.subtitleEmpty")}
-            </p>
-          </div>
-          <div className="flex flex-col gap-3 lg:items-end">
-            <div className="flex flex-col gap-2 sm:flex-row">
-              {isAdmin && (
-                <>
-                  <Button
-                    variant="outline"
-                    onClick={() => crawl.mutate({ mode: "quick", limit: 8 })}
-                    disabled={crawl.isPending || isRunning}
-                  >
-                    {crawl.isPending || isRunning ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <RefreshCw className="h-4 w-4" />
-                    )}
-                    {t("dash.quickFetch")}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => crawl.mutate({ mode: "full" })}
-                    disabled={crawl.isPending || isRunning}
-                  >
-                    {crawl.isPending || isRunning ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <RefreshCw className="h-4 w-4" />
-                    )}
-                    {t("dash.fullSync")}
-                  </Button>
-                  {isRunning && runRow && (
-                    <Button
-                      variant="ghost"
-                      onClick={() => cancel.mutate(runRow.id)}
-                      disabled={cancel.isPending}
-                    >
-                      {t("common.cancel")}
-                    </Button>
-                  )}
-                </>
-              )}
-              <Button onClick={() => compute.mutate()} disabled={compute.isPending}>
-                {compute.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Sparkles className="h-4 w-4" />
-                )}
-                {t("dash.recompute")}
-              </Button>
-            </div>
-            {isAdmin && (
-              <p className="text-xs text-muted-foreground lg:max-w-md lg:text-right">
-                {t("dash.fullSyncHint")}
-              </p>
-            )}
-          </div>
-        </div>
-        <div className="mt-6 grid gap-3 sm:grid-cols-4">
-          <Metric label={t("dash.totalScored")} value={all.length} />
-          <Metric label={t("dash.eligible")} value={eligible.length} tone="success" />
-          <Metric label={t("dash.partial")} value={partial.length} tone="warning" />
-          <Metric label={t("dash.bestScore")} value={`${bestScore}%`} />
-        </div>
-      </section>
+      <PageHeader
+        eyebrow={t("dash.badge")}
+        icon={SearchCheck}
+        title={t("dash.title")}
+        description={
+          all.length ? t("dash.subtitleScored", { count: all.length }) : t("dash.subtitleEmpty")
+        }
+        actions={headerActions}
+      />
+      <div className="mt-6 grid gap-3 sm:grid-cols-4">
+        <MetricTile label={t("dash.totalScored")} value={all.length} />
+        <MetricTile label={t("dash.eligible")} value={eligible.length} tone="success" />
+        <MetricTile label={t("dash.partial")} value={partial.length} tone="warning" />
+        <MetricTile label={t("dash.bestScore")} value={`${bestScore}%`} />
+      </div>
 
       {isAdmin && <CrawlStatusPanel run={runRow} isLoading={latestRun.isLoading} />}
 
@@ -256,7 +253,7 @@ function Dashboard() {
 
 function DashboardSkeleton({ t }: { t: ReturnType<typeof useT> }) {
   return (
-    <div className="rounded-2xl border bg-card p-8 text-center text-muted-foreground">
+    <div className="rounded-xl border bg-card/92 p-8 text-center text-muted-foreground shadow-sm">
       <Loader2 className="mx-auto h-5 w-5 animate-spin text-primary" />
       <p className="mt-3">{t("dash.loadingProfile")}</p>
     </div>
@@ -302,36 +299,36 @@ function EmptyMatches({
   onCompute: () => void;
 }) {
   return (
-    <div className="rounded-2xl border bg-card p-8 text-center shadow-sm">
-      <FileWarning className="mx-auto h-9 w-9 text-primary" />
-      <h2 className="mt-4 text-xl font-bold">{t("dash.noMatches")}</h2>
-      <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
-        {isAdmin ? t("dash.noMatchesAdmin") : t("dash.noMatchesUser")}
-      </p>
-      <div className="mt-6 flex flex-col justify-center gap-2 sm:flex-row">
-        {isAdmin && (
-          <Button onClick={onCrawlAndCompute} disabled={crawlPending || computePending}>
-            {crawlPending || computePending ? (
+    <EmptyState
+      title={t("dash.noMatches")}
+      description={isAdmin ? t("dash.noMatchesAdmin") : t("dash.noMatchesUser")}
+      icon={FileWarning}
+      action={
+        <div className="flex flex-col justify-center gap-2 sm:flex-row">
+          {isAdmin && (
+            <Button onClick={onCrawlAndCompute} disabled={crawlPending || computePending}>
+              {crawlPending || computePending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              {t("dash.fetchAndScore")}
+            </Button>
+          )}
+          <Button variant="outline" onClick={onCompute} disabled={computePending}>
+            {computePending ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              <RefreshCw className="h-4 w-4" />
+              <Sparkles className="h-4 w-4" />
             )}
-            {t("dash.fetchAndScore")}
+            {t("dash.recomputeMatches")}
           </Button>
-        )}
-        <Button variant="outline" onClick={onCompute} disabled={computePending}>
-          {computePending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Sparkles className="h-4 w-4" />
-          )}
-          {t("dash.recomputeMatches")}
-        </Button>
-        <Link to="/onboarding">
-          <Button variant="outline">{t("dash.updateProfile")}</Button>
-        </Link>
-      </div>
-    </div>
+          <Link to="/onboarding">
+            <Button variant="outline">{t("dash.updateProfile")}</Button>
+          </Link>
+        </div>
+      }
+    />
   );
 }
 
@@ -354,13 +351,13 @@ function Section({
 }) {
   if (items.length === 0) return null;
   return (
-    <section>
+    <Surface className="p-0">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 className="text-sm font-semibold uppercase text-muted-foreground">
+        <h2 className="px-5 pt-5 text-sm font-bold text-muted-foreground">
           {title} ({items.length})
         </h2>
       </div>
-      <div className="grid gap-3">
+      <div className="grid gap-0 divide-y">
         {items.map((m) => (
           <MatchCard
             key={m.id}
@@ -373,7 +370,7 @@ function Section({
           />
         ))}
       </div>
-    </section>
+    </Surface>
   );
 }
 
@@ -430,7 +427,7 @@ function MatchCard({
 
   return (
     <>
-      <article className="rounded-xl border bg-card p-4 shadow-sm transition hover:border-primary/35 hover:shadow-md sm:p-5">
+      <article className="bg-card p-4 transition hover:bg-accent/35 sm:p-5">
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_110px]">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
@@ -602,7 +599,7 @@ function CrawlStatusPanel({ run, isLoading }: { run: CrawlRun | null; isLoading:
   const isLive = run?.status === "running" || run?.status === "queued";
 
   return (
-    <section className="rounded-2xl border bg-card p-5 shadow-sm sm:p-6">
+    <section className="rounded-xl border bg-card/92 p-5 shadow-sm shadow-primary/5 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-xs font-medium uppercase text-muted-foreground">Crawler status</p>

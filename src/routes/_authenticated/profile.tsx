@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { PageHeader, Surface } from "@/components/app-ui";
 import { toast } from "sonner";
 import {
   BriefcaseBusiness,
@@ -159,16 +160,14 @@ function ProfilePage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <div className="rounded-2xl border bg-card p-6 shadow-sm">
-        <p className="text-sm font-semibold uppercase text-primary">Candidate profile</p>
-        <h1 className="mt-2 text-3xl font-bold">Keep your matching profile current</h1>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-          Upload a newer resume anytime. ChakriFit extracts fields, then you can edit and save
-          before recomputing matches.
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="Candidate profile"
+        icon={UserRound}
+        title="Keep your matching profile current"
+        description="Upload a newer resume anytime. ChakriFit extracts fields, then you can edit and save before recomputing matches."
+      />
 
-      <label className="block cursor-pointer rounded-2xl border-2 border-dashed border-primary/30 bg-card p-8 text-center shadow-sm transition hover:bg-accent/40">
+      <label className="block cursor-pointer rounded-xl border-2 border-dashed border-primary/30 bg-card/92 p-8 text-center shadow-sm shadow-primary/5 transition hover:border-primary/50 hover:bg-accent/40">
         <input
           type="file"
           accept=".pdf,.docx,.txt"
@@ -308,13 +307,13 @@ function ProfilePage() {
 
 function Panel({ title, icon, children }: { title: string; icon: ReactNode; children: ReactNode }) {
   return (
-    <section className="rounded-2xl border bg-card p-5 shadow-sm">
+    <Surface>
       <div className="mb-4 flex items-center gap-2 font-semibold">
         {icon}
         {title}
       </div>
       {children}
-    </section>
+    </Surface>
   );
 }
 
@@ -334,7 +333,7 @@ function ListEditor<T extends object>({
   render: (item: T, set: (n: T) => void) => ReactNode;
 }) {
   return (
-    <section className="space-y-3 rounded-2xl border bg-card p-5 shadow-sm">
+    <section className="space-y-3 rounded-xl border bg-card/92 p-5 shadow-sm shadow-primary/5">
       <div className="flex items-center justify-between gap-3">
         <Label className="flex items-center gap-2 font-semibold">
           {icon}

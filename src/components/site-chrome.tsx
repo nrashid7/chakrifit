@@ -6,10 +6,13 @@ import { useT } from "@/i18n";
 
 export function SiteHeader({ right }: { right?: ReactNode }) {
   return (
-    <header className="sticky top-0 z-40 border-b bg-background/90 backdrop-blur-xl">
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6">
-        <Link to="/" className="flex min-w-0 items-center gap-3 font-display font-bold text-lg">
-          <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
+    <header className="sticky top-0 z-40 border-b bg-background/88 backdrop-blur-xl">
+      <div className="mx-auto flex min-h-16 max-w-7xl items-center justify-between gap-3 px-4 py-2 sm:px-6">
+        <Link
+          to="/"
+          className="flex min-w-0 items-center gap-3 rounded-lg font-display text-lg font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm shadow-primary/25">
             <BriefcaseBusiness className="h-5 w-5" />
           </span>
           <span className="truncate">ChakriFit</span>
@@ -26,7 +29,7 @@ export function SiteHeader({ right }: { right?: ReactNode }) {
 export function SiteFooter() {
   const t = useT();
   return (
-    <footer className="mt-16 border-t bg-background/80 py-8 text-sm text-muted-foreground">
+    <footer className="mt-16 border-t bg-background/85 py-8 text-sm text-muted-foreground">
       <div className="mx-auto flex max-w-7xl flex-col gap-5 px-4 sm:px-6 md:flex-row md:items-center md:justify-between">
         <div className="max-w-xl">
           <div className="flex items-center gap-2 font-medium text-foreground">
