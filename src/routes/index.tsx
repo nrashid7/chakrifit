@@ -59,16 +59,16 @@ function Landing() {
                 {t("nav.logIn")}
               </Button>
             </Link>
-            <Link to="/login">
+            <Link to="/login" className="landing-header-cta">
               <Button size="sm">{t("nav.getStarted")}</Button>
             </Link>
           </>
         }
       />
 
-      <main>
+      <main className="overflow-x-hidden">
         <section className="mx-auto grid min-h-[calc(100dvh-4rem)] max-w-7xl items-center gap-10 px-4 py-10 sm:px-6 lg:grid-cols-[0.92fr_1.08fr] lg:py-14">
-          <div className="max-w-3xl">
+          <div className="min-w-0 max-w-3xl">
             <Badge variant="secondary" className="gap-2 px-3 py-1">
               <ShieldCheck className="h-3.5 w-3.5 text-primary" />
               {t("landing.heroBadge")}
@@ -80,14 +80,14 @@ function Landing() {
               {t("landing.heroSubtitle")}
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Link to="/login">
+              <Link to="/login" className="w-full sm:w-auto">
                 <Button size="lg" className="w-full sm:w-auto">
                   <Upload className="h-4 w-4" />
                   {t("landing.uploadResume")}
                   <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>
-              <a href="#workflow">
+              <a href="#workflow" className="w-full sm:w-auto">
                 <Button size="lg" variant="outline" className="w-full bg-card/80 sm:w-auto">
                   {t("landing.seeWorkflow")}
                 </Button>
@@ -206,10 +206,10 @@ function Landing() {
 
 function ProductPreview({ t }: { t: ReturnType<typeof useT> }) {
   return (
-    <div className="relative">
+    <div className="relative min-w-0">
       <div className="absolute -inset-4 rounded-[2rem] bg-primary/10 blur-3xl" />
-      <div className="relative rounded-xl border bg-card/95 p-3 shadow-2xl shadow-primary/12">
-        <div className="rounded-lg border bg-background/80 p-4">
+      <div className="relative min-w-0 overflow-hidden rounded-xl border bg-card/95 p-3 shadow-2xl shadow-primary/12">
+        <div className="min-w-0 rounded-lg border bg-background/80 p-4">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-4">
             <div>
               <p className="text-xs font-semibold text-muted-foreground">
@@ -277,13 +277,13 @@ function PreviewMatch({
         ? "text-warning-foreground"
         : "text-muted-foreground";
   return (
-    <article className="rounded-lg border bg-card p-4">
+    <article className="min-w-0 rounded-lg border bg-card p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="font-semibold">{title}</h3>
           <p className="text-sm text-muted-foreground">{org}</p>
         </div>
-        <div className={`text-2xl font-bold tabular-nums ${toneClass}`}>{score}</div>
+        <div className={`shrink-0 text-2xl font-bold tabular-nums ${toneClass}`}>{score}</div>
       </div>
       <ul className="mt-3 space-y-1 text-sm text-muted-foreground">
         {notes.map((note) => (

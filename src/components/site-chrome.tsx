@@ -17,7 +17,7 @@ export function SiteHeader({ right }: { right?: ReactNode }) {
           </span>
           <span className="truncate">ChakriFit</span>
         </Link>
-        <div className="flex min-w-0 items-center gap-1 overflow-x-auto text-sm sm:gap-2">
+        <div className="flex min-w-0 items-center justify-end gap-1 overflow-hidden text-sm sm:gap-2">
           <LanguageToggle />
           {right}
         </div>
